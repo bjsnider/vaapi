@@ -1,9 +1,9 @@
 libva (1.0.1-1) unstable; urgency=low
 
-  * New upstream release.
+  * New upstream release. (Closes: #569635)
   * Rework debianization.
 
- -- Andres Mejia <mcitadel@gmail.com>  Fri, 12 Feb 2010 13:07:50 -0500
+ -- Andres Mejia <mcitadel@gmail.com>  Fri, 12 Feb 2010 18:55:19 -0500
 
 libva (0.24-1) unstable; urgency=low
 
