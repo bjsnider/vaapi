@@ -1,0 +1,2 @@
+usr/lib/libva.so.*
+usr/lib/dri/dummy_drv_video.so

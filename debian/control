@@ -1,0 +1,95 @@
+Source: libva
+Priority: optional
+Maintainer: Debian Multimedia Maintainers <pkg-multimedia-maintainers@lists.alioth.debian.org>
+Uploaders: Andres Mejia <mcitadel@gmail.com>
+Build-Depends: debhelper (>= 7.0.50),
+               pkg-config,
+               libdrm-dev (>= 2.3.0),
+               libxext-dev,
+               libxfixes-dev,
+               libx11-dev,
+Standards-Version: 3.8.4
+Section: libs
+DM-Upload-Allowed: yes
+Homepage: http://www.freedesktop.org/wiki/Software/vaapi
+Vcs-Git: git://git.debian.org/git/pkg-multimedia/libva.git
+Vcs-Browser: http://git.debian.org/?p=pkg-multimedia/libva.git;a=summary
+
+Package: libva-dev
+Section: libdevel
+Architecture: any
+Depends: libva1 (= ${binary:Version}),
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: Video Acceleration (VA) API for Linux -- development files
+ Video Acceleration API (VA API) is a library ("libVA") and API specification
+ which enables and provides access to graphics hardware (GPU) acceleration for
+ video processing on Linux and UNIX based operating systems. Accelerated
+ processing includes video decoding, video encoding, subpicture blending and
+ rendering. The specification was originally designed by Intel for its GMA
+ (Graphics Media Accelerator) series of GPU hardware, the API is however not
+ limited to GPUs or Intel specific hardware, as other hardware and manufacturers
+ can also freely use this API for hardware accelerated video decoding.
+ .
+ This package provides the development environment for libva.
+
+Package: libva1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Video Acceleration (VA) API for Linux -- runtime
+ Video Acceleration API (VA API) is a library ("libVA") and API specification
+ which enables and provides access to graphics hardware (GPU) acceleration for
+ video processing on Linux and UNIX based operating systems. Accelerated
+ processing includes video decoding, video encoding, subpicture blending and
+ rendering. The specification was originally designed by Intel for its GMA
+ (Graphics Media Accelerator) series of GPU hardware, the API is however not
+ limited to GPUs or Intel specific hardware, as other hardware and manufacturers
+ can also freely use this API for hardware accelerated video decoding.
+ .
+ This package provides the main libva library.
+
+Package: libva-x11-1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Video Acceleration (VA) API for Linux -- X11 runtime
+ Video Acceleration API (VA API) is a library ("libVA") and API specification
+ which enables and provides access to graphics hardware (GPU) acceleration for
+ video processing on Linux and UNIX based operating systems. Accelerated
+ processing includes video decoding, video encoding, subpicture blending and
+ rendering. The specification was originally designed by Intel for its GMA
+ (Graphics Media Accelerator) series of GPU hardware, the API is however not
+ limited to GPUs or Intel specific hardware, as other hardware and manufacturers
+ can also freely use this API for hardware accelerated video decoding.
+ .
+ This package provides the libva-x11 library.
+
+Package: i965-va-driver
+Architecture: any
+Provides: va-driver
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Video Acceleration (VA) API for Linux -- i965 VA driver
+ Video Acceleration API (VA API) is a library ("libVA") and API specification
+ which enables and provides access to graphics hardware (GPU) acceleration for
+ video processing on Linux and UNIX based operating systems. Accelerated
+ processing includes video decoding, video encoding, subpicture blending and
+ rendering. The specification was originally designed by Intel for its GMA
+ (Graphics Media Accelerator) series of GPU hardware, the API is however not
+ limited to GPUs or Intel specific hardware, as other hardware and manufacturers
+ can also freely use this API for hardware accelerated video decoding.
+ .
+ This package provides the Intel i965 VA backend driver.
+
+Package: vainfo
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Video Acceleration (VA) API for Linux -- info program
+ Video Acceleration API (VA API) is a library ("libVA") and API specification
+ which enables and provides access to graphics hardware (GPU) acceleration for
+ video processing on Linux and UNIX based operating systems. Accelerated
+ processing includes video decoding, video encoding, subpicture blending and
+ rendering. The specification was originally designed by Intel for its GMA
+ (Graphics Media Accelerator) series of GPU hardware, the API is however not
+ limited to GPUs or Intel specific hardware, as other hardware and manufacturers
+ can also freely use this API for hardware accelerated video decoding.
+ .
+ This package provides the vainfo program.

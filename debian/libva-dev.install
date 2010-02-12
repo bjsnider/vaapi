@@ -1,0 +1,4 @@
+usr/include
+usr/lib/libva.so
+usr/lib/libva-x11.so
+usr/lib/pkgconfig

@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+
+CONFIGURE_OPTIONS ?= --prefix=/usr --enable-i965-driver
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_testdir
+	./configure $(CONFIGURE_OPTIONS)

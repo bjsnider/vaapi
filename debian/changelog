@@ -1,0 +1,42 @@
+libva (1.0.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * Rework debianization.
+
+ -- Andres Mejia <mcitadel@gmail.com>  Fri, 12 Feb 2010 13:07:50 -0500
+
+libva (0.24-1) unstable; urgency=low
+
+  * Updated to v0.24
+  * Display attributes added
+  * H264 parameter fixes
+  * Swapped vaGetConfigAttributes and vaQueryConfigAttributes
+
+ -- Waldo Bastian <waldo.bastian@intel.com>  Thu, 20 Sep 2007 15:08:04 -0700
+
+libva (0.22-1) unstable; urgency=low
+
+  * Updated to v0.22
+  * VAImage and VASubpicture added
+
+ -- Waldo Bastian <waldo.bastian@intel.com>  Fri, 07 Sep 2007 04:32:28 -0700
+
+libva (0.20-1) unstable; urgency=low
+
+  * Updated to v0.20
+  * Clean up & exporting DRI interface
+
+ -- Waldo Bastian <waldo.bastian@intel.com>  Thu, 09 Aug 2007 11:49:43 -0700
+
+libva (0.20~-1) unstable; urgency=low
+
+  * Add VA_INVALID_SURFACE
+
+ -- Waldo Bastian <waldo.bastian@intel.com>  Wed, 11 Jul 2007 17:24:10 -0700
+
+libva (0.20~~-1) unstable; urgency=low
+
+  * Initial release of libva
+
+ -- Waldo Bastian <waldo.bastian@intel.com>  Mon, 18 Jun 2007 21:35:31 -0700
+
