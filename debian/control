@@ -17,8 +17,11 @@ Vcs-Browser: http://git.debian.org/?p=pkg-multimedia/libva.git;a=summary
 
 Package: libva-dev
 Section: libdevel
-Architecture: any
-Depends: libva1 (= ${binary:Version}),
+Architecture: all
+Depends: libva1 (>= ${source:Upstream-Version}),
+         libva1 (<< ${source:Upstream-Version}+1~),
+         libva-x11-1 (>= ${source:Upstream-Version}),
+         libva-x11-1 (<< ${source:Upstream-Version}+1~),
          ${shlibs:Depends},
          ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- development files
