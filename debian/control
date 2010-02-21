@@ -3,6 +3,7 @@ Priority: optional
 Maintainer: Debian Multimedia Maintainers <pkg-multimedia-maintainers@lists.alioth.debian.org>
 Uploaders: Andres Mejia <mcitadel@gmail.com>
 Build-Depends: debhelper (>= 7.0.50),
+               quilt (>= 0.46-7),
                pkg-config,
                libdrm-dev (>= 2.3.0),
                libxext-dev,
