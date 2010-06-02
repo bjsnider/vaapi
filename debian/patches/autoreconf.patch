@@ -1242,6 +1242,18 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -310,9 +312,9 @@
+ libva_la_LDFLAGS = $(LDADD) -no-undefined
+ libva_la_LIBADD = $(LIBVA_LIBS) -ldl
+ libva_x11_la_SOURCES = 
+-libva_x11_la_LIBADD = $(libvacorelib) x11/libva_x11.la $(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(DRM_LIBS) $(XFIXES_LIBS)
++libva_x11_la_LIBADD = x11/libva_x11.la $(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(DRM_LIBS) $(XFIXES_LIBS)
+ libva_x11_la_LDFLAGS = $(LDADD)
+-libva_x11_la_DEPENDENCIES = $(libvacorelib) x11/libva_x11.la
++libva_x11_la_DEPENDENCIES = x11/libva_x11.la
+ SUBDIRS = x11
+ libva_la_SOURCES = va.c
+ libvaincludedir = ${includedir}/va
 --- a/src/x11/Makefile.in
 +++ b/src/x11/Makefile.in
 @@ -179,6 +179,8 @@
@@ -1264,6 +1276,21 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -262,8 +264,12 @@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ AM_CFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/test/basic -I$(top_srcdir)/src/x11 -DIN_LIBVA
+-vainfo_LDADD = $(top_srcdir)/src/$(libvabackendlib)
+-vainfo_DEPENDENCIES = $(top_srcdir)/src/$(libvabackendlib)
++vainfo_LDADD = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
++vainfo_DEPENDENCIES = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
+ vainfo_SOURCES = vainfo.c
+ SUBDIRS = basic decode encode putsurface
+ all: all-recursive
 --- a/test/basic/Makefile.in
 +++ b/test/basic/Makefile.in
 @@ -196,6 +196,8 @@
@@ -1275,6 +1302,17 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -264,7 +266,9 @@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ AM_CFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/x11 -DIN_LIBVA
+-TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib)
++TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
+ test_01_LDADD = $(TEST_LIBS)
+ test_01_SOURCES = test_01.c
+ test_02_LDADD = $(TEST_LIBS)
 --- a/test/decode/Makefile.in
 +++ b/test/decode/Makefile.in
 @@ -157,6 +157,8 @@
@@ -1286,6 +1324,17 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -225,7 +227,9 @@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ AM_CFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/x11 -DIN_LIBVA
+-TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib)
++TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
+ mpeg2vldemo_LDADD = $(TEST_LIBS)
+ mpeg2vldemo_SOURCES = mpeg2vldemo.c
+ all: all-am
 --- a/test/encode/Makefile.in
 +++ b/test/encode/Makefile.in
 @@ -157,6 +157,8 @@
@@ -1297,6 +1346,17 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -225,7 +227,9 @@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ AM_CFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/x11 -DIN_LIBVA
+-TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib)
++TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
+ h264encode_LDADD = $(TEST_LIBS)
+ h264encode_SOURCES = h264encode.c
+ all: all-am
 --- a/test/putsurface/Makefile.in
 +++ b/test/putsurface/Makefile.in
 @@ -157,6 +157,8 @@
@@ -1308,3 +1368,14 @@ Patch that applies modifications after running 'autoreconf -vif'
  RANLIB = @RANLIB@
  SED = @SED@
  SET_MAKE = @SET_MAKE@
+@@ -225,7 +227,9 @@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ AM_CFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/x11 -DIN_LIBVA
+-TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib)
++TEST_LIBS = $(top_srcdir)/src/$(libvabackendlib) \
++	$(top_srcdir)/src/$(libvacorelib)
++
+ putsurface_LDADD = $(TEST_LIBS)
+ putsurface_SOURCES = putsurface.c
+ all: all-am
