@@ -68,7 +68,7 @@ Description: Video Acceleration (VA) API for Linux -- X11 runtime
  This package provides the libva-x11 library.
 
 Package: i965-va-driver
-Architecture: any
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Provides: va-driver
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- i965 VA driver
