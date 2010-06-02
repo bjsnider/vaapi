@@ -3,11 +3,9 @@ Fix for strtok_r is for "expected ‘char * __restrict__’ but argument is of t
 ‘const char *’" warning.
 Second is to fix "cast to pointer from integer of different size" warning.
 ==========================================================================
-diff --git a/src/va.c b/src/va.c
-index bc469a0..09a7a3c 100644
 --- a/src/va.c
 +++ b/src/va.c
-@@ -141,7 +141,7 @@ static VAStatus va_openDriver(VADisplay dpy, char *driver_name)
+@@ -141,7 +141,7 @@
      }
  
      search_path = strdup((const char *)search_path);
@@ -16,11 +14,9 @@ index bc469a0..09a7a3c 100644
      while(driver_dir)
      {
          void *handle = NULL;
-diff --git a/test/putsurface/putsurface.c b/test/putsurface/putsurface.c
-index 335368a..638bee3 100644
 --- a/test/putsurface/putsurface.c
 +++ b/test/putsurface/putsurface.c
-@@ -241,7 +241,7 @@ static int putsurface_thread(void *data)
+@@ -241,7 +241,7 @@
          while (surface_id == VA_INVALID_SURFACE)
              surface_id = get_next_free_surface(&index);
  

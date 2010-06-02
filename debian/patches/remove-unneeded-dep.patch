@@ -1,7 +1,5 @@
 Patch to remove unnecessary dependency to libva-x11 for dummy driver
 ==========================================================================
-diff --git a/dummy_drv_video/Makefile.am b/dummy_drv_video/Makefile.am
-index 4e75a7b..b5bb74c 100644
 --- a/dummy_drv_video/Makefile.am
 +++ b/dummy_drv_video/Makefile.am
 @@ -23,8 +23,6 @@
