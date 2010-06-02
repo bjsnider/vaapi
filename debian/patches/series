@@ -1,1 +1,3 @@
 fix-warnings.patch
+remove-unneeded-dep.patch
+autoreconf.patch
