@@ -1,3 +1,9 @@
+libva (1.0.1-4) UNRELEASED; urgency=low
+
+  * Prepare for new release.
+
+ -- Andres Mejia <mcitadel@gmail.com>  Sat, 05 Jun 2010 19:35:07 -0400
+
 libva (1.0.1-3) unstable; urgency=low
 
   * Don't build i965 driver on non-i386 or non-amd64 architectures.
