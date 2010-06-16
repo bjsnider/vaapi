@@ -30,7 +30,9 @@
 #ifndef _I965_DRV_VIDEO_H_
 #define _I965_DRV_VIDEO_H_
 
-#include "va.h"
+#include <va/va.h>
+#include <va/va_backend.h>
+
 #include "object_heap.h"
 
 #include "intel_driver.h"
@@ -51,6 +53,7 @@ struct buffer_store
     unsigned char *buffer;
     dri_bo *bo;
     int ref_count;
+    int num_elements;
 };
     
 struct object_config 
@@ -62,15 +65,20 @@ struct object_config
     int num_attribs;
 };
 
+#define NUM_SLICES     10
+
 struct decode_state
 {
     struct buffer_store *pic_param;
-    struct buffer_store *slice_param;
+    struct buffer_store **slice_params;
     struct buffer_store *iq_matrix;
     struct buffer_store *bit_plane;
-    struct buffer_store *slice_data;
+    struct buffer_store **slice_datas;
     VASurfaceID current_render_target;
-    int num_slices;
+    int max_slice_params;
+    int max_slice_datas;
+    int num_slice_params;
+    int num_slice_datas;
 };
 
 struct object_context 
@@ -86,6 +94,9 @@ struct object_context
     struct decode_state decode_state;
 };
 
+#define SURFACE_REFERENCED      (1 << 0)
+#define SURFACE_DISPLAYED       (1 << 1)
+
 struct object_surface 
 {
     struct object_base base;
@@ -94,7 +105,10 @@ struct object_surface
     int width;
     int height;
     int size;
+    int flags;
     dri_bo *bo;
+    void (*free_private_data)(void **data);
+    void *private_data;
 };
 
 struct object_buffer 
@@ -126,8 +140,6 @@ struct object_subpic
     int height;
     dri_bo *bo;
 };
-
-
 
 struct i965_driver_data 
 {

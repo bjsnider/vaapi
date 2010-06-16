@@ -23,13 +23,13 @@
 # libva package version number, (as distinct from shared library version)
 m4_define([libva_major_version], [0])
 m4_define([libva_minor_version], [31])
-m4_define([libva_micro_version], [0])
+m4_define([libva_micro_version], [1])
 
 m4_define([libva_version],
           [libva_major_version.libva_minor_version.libva_micro_version])
 
 # if the library source code has changed, increment revision
-m4_define([libva_lt_revision], [1])
+m4_define([libva_lt_revision], [3])
 # if any interface was added/removed/changed, then inc current, reset revision
 m4_define([libva_lt_current], [1])
 # if any interface was added since last public release, then increment age
@@ -60,11 +60,21 @@ LIBVA_LT_LDFLAGS="-version-info $LIBVA_LT_VERSION"
 AC_SUBST(LIBVA_LT_VERSION)
 AC_SUBST(LIBVA_LT_LDFLAGS)
 
+AC_ARG_ENABLE(glx,
+              [AC_HELP_STRING([--enable-glx],
+                              [build with OpenGL for X11 support])],
+              [], [enable_glx=yes])
+
 AC_ARG_ENABLE(dummy-driver,
               [AC_HELP_STRING([--enable-dummy-driver],
                               [build dummy video driver])],
               [], [enable_dummy_driver=yes])
 AM_CONDITIONAL(BUILD_DUMMY_DRIVER, test x$enable_dummy_driver = xyes)
+
+AC_ARG_ENABLE(dummy-backend,
+              [AC_HELP_STRING([--enable-dummy-backend],
+                              [build dummy libva backend])],
+              [], [enable_dummy_backend=no])
 
 AC_ARG_ENABLE(i965-driver,
               [AC_HELP_STRING([--enable-i965-driver],
@@ -100,6 +110,30 @@ if test x$enable_i965_driver = xyes && ! $PKG_CONFIG --atleast-version=2.4 libdr
 fi
 AM_CONDITIONAL(BUILD_I965_DRIVER, test x$enable_i965_driver = xyes)
 
+if test x$enable_dummy_backend = xyes; then
+    PKG_CHECK_MODULES([UDEV], [libudev], [libudev=yes], [libudev=no])
+fi
+if test x$libudev = xno; then
+   enable_dummy_backend=no
+fi
+AM_CONDITIONAL(BUILD_DUMMY_BACKEND, test x$enable_dummy_backend = xyes)
+
+# Check for OpenGL (X11)
+USE_GLX="no"
+GL_DEPS_CFLAGS=""
+GL_DEPS_LIBS=""
+if test x$enable_glx = xyes; then
+    AC_CHECK_HEADERS([GL/gl.h])
+    AC_CHECK_HEADERS([GL/glx.h])
+    AC_CHECK_LIB(GL, glXCreateContext, [
+        USE_GLX="yes"
+        GL_DEPS_LIBS="-lX11 -lGL"
+    ])
+fi
+AC_SUBST(GL_DEPS_CFLAGS)
+AC_SUBST(GL_DEPS_LIBS)
+AM_CONDITIONAL(USE_GLX, test "$USE_GLX" = "yes")
+
 # We only need the headers, we don't link against the DRM libraries
 LIBVA_CFLAGS="$DRM_CFLAGS"
 AC_SUBST(LIBVA_CFLAGS)
@@ -116,12 +150,16 @@ AC_SUBST([libvabackendlib])
 
 AC_OUTPUT([
 	Makefile
-	src/Makefile
-	src/va_version.h
-	src/x11/Makefile
+	va/Makefile
+	va/va_version.h
+	va/x11/Makefile
+	va/glx/Makefile
+	va/dummy/Makefile
 	dummy_drv_video/Makefile
 	i965_drv_video/Makefile
 	i965_drv_video/shaders/Makefile
+	i965_drv_video/shaders/h264/Makefile
+	i965_drv_video/shaders/h264/mc/Makefile
 	i965_drv_video/shaders/mpeg2/Makefile
 	i965_drv_video/shaders/mpeg2/vld/Makefile
 	i965_drv_video/shaders/render/Makefile
@@ -132,5 +170,6 @@ AC_OUTPUT([
 	test/encode/Makefile
 	libva.pc
 	libva-x11.pc
+	libva-glx.pc
 ])
 
