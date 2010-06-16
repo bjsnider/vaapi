@@ -1,19 +1,6 @@
 Patch to fix a few warnings.
-Fix for strtok_r is for "expected ‘char * __restrict__’ but argument is of type
-‘const char *’" warning.
-Second is to fix "cast to pointer from integer of different size" warning.
+Fix "cast to pointer from integer of different size" warning.
 ==========================================================================
---- a/src/va.c
-+++ b/src/va.c
-@@ -141,7 +141,7 @@
-     }
- 
-     search_path = strdup((const char *)search_path);
--    driver_dir = strtok_r((const char *)search_path, ":", &saveptr);
-+    driver_dir = strtok_r(search_path, ":", &saveptr);
-     while(driver_dir)
-     {
-         void *handle = NULL;
 --- a/test/putsurface/putsurface.c
 +++ b/test/putsurface/putsurface.c
 @@ -241,7 +241,7 @@
