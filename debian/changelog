@@ -1,8 +1,8 @@
-libva (1.0.1-4) UNRELEASED; urgency=low
+libva (1.0.3-1) UNRELEASED; urgency=low
 
-  * Prepare for new release.
+  * New upstream release.
 
- -- Andres Mejia <mcitadel@gmail.com>  Sat, 05 Jun 2010 19:35:07 -0400
+ -- Andres Mejia <mcitadel@gmail.com>  Wed, 16 Jun 2010 18:34:07 -0400
 
 libva (1.0.1-3) unstable; urgency=low
 
