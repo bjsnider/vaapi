@@ -91,10 +91,12 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(i965_drv_video_ladir)"
 LTLIBRARIES = $(i965_drv_video_la_LTLIBRARIES)
-i965_drv_video_la_DEPENDENCIES = ../src/libva-x11.la
+i965_drv_video_la_DEPENDENCIES = ../va/libva-x11.la
 am_i965_drv_video_la_OBJECTS = object_heap.lo intel_batchbuffer.lo \
-	intel_memman.lo intel_driver.lo i965_media.lo \
-	i965_media_mpeg2.lo i965_render.lo i965_drv_video.lo
+	intel_batchbuffer_dump.lo intel_memman.lo intel_driver.lo \
+	i965_media.lo i965_media_mpeg2.lo i965_media_h264.lo \
+	i965_render.lo i965_drv_video.lo i965_avc_bsd.lo \
+	i965_avc_hw_scoreboard.lo i965_avc_ildb.lo
 i965_drv_video_la_OBJECTS = $(am_i965_drv_video_la_OBJECTS)
 i965_drv_video_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -183,6 +185,8 @@ EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GEN4ASM_CFLAGS = @GEN4ASM_CFLAGS@
 GEN4ASM_LIBS = @GEN4ASM_LIBS@
+GL_DEPS_CFLAGS = @GL_DEPS_CFLAGS@
+GL_DEPS_LIBS = @GL_DEPS_LIBS@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -223,11 +227,15 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
+UDEV_CFLAGS = @UDEV_CFLAGS@
+UDEV_LIBS = @UDEV_LIBS@
 VERSION = @VERSION@
 X11_CFLAGS = @X11_CFLAGS@
 X11_LIBS = @X11_LIBS@
@@ -291,32 +299,42 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = shaders
-AM_CFLAGS = -Wall -I$(top_srcdir)/src -I$(top_srcdir)/src/x11 @DRM_CFLAGS@ -DIN_LIBVA
+AM_CFLAGS = -Wall -I$(top_srcdir)/va -I$(top_srcdir)/va/x11 @DRM_CFLAGS@
 i965_drv_video_la_LTLIBRARIES = i965_drv_video.la
 i965_drv_video_ladir = @LIBVA_DRIVERS_PATH@
 i965_drv_video_la_LDFLAGS = -module -avoid-version -no-undefined -Wl,--no-undefined @DRM_LIBS@ -ldrm_intel
-i965_drv_video_la_LIBADD = ../src/libva-x11.la -lpthread
+i965_drv_video_la_LIBADD = ../va/libva-x11.la -lpthread
 i965_drv_video_la_SOURCES = \
 	object_heap.c		\
 	intel_batchbuffer.c	\
+	intel_batchbuffer_dump.c\
 	intel_memman.c		\
 	intel_driver.c		\
 	i965_media.c		\
 	i965_media_mpeg2.c	\
+	i965_media_h264.c	\
 	i965_render.c		\
-	i965_drv_video.c
+	i965_drv_video.c	\
+	i965_avc_bsd.c		\
+	i965_avc_hw_scoreboard.c\
+	i965_avc_ildb.c
 
 noinst_HEADERS = \
 	object_heap.h           \
 	intel_batchbuffer.h     \
+	intel_batchbuffer_dump.h\
 	intel_memman.h          \
 	intel_driver.h          \
 	i965_media.h            \
 	i965_media_mpeg2.h      \
+	i965_media_h264.h	\
 	i965_render.h           \
 	i965_drv_video.h        \
 	i965_defines.h          \
-	i965_structs.h
+	i965_structs.h		\
+	i965_avc_bsd.h		\
+	i965_avc_hw_scoreboard.h\
+	i965_avc_ildb.h
 
 all: all-recursive
 
@@ -392,11 +410,16 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_avc_bsd.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_avc_hw_scoreboard.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_avc_ildb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_drv_video.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_media.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_media_h264.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_media_mpeg2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i965_render.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intel_batchbuffer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intel_batchbuffer_dump.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intel_driver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intel_memman.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/object_heap.Plo@am__quote@
