@@ -69,7 +69,8 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libva_x11_la_LIBADD =
 am_libva_x11_la_OBJECTS = va_x11.lo va_dri.lo va_dri2.lo \
-	va_dricommon.lo dri2_util.lo dri1_util.lo va_nvctrl.lo
+	va_dricommon.lo dri2_util.lo dri1_util.lo va_nvctrl.lo \
+	va_fglrx.lo
 libva_x11_la_OBJECTS = $(am_libva_x11_la_OBJECTS)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -256,8 +257,8 @@ AM_CFLAGS = -DLINUX -I$(top_srcdir)/va $(DRM_CFLAGS)
 noinst_LTLIBRARIES = libva_x11.la	
 libva_x11includedir = ${includedir}/va
 libva_x11include_HEADERS = va_dri.h va_dri2.h va_dricommon.h
-libva_x11_la_SOURCES = va_x11.c va_dri.c va_dri2.c va_dricommon.c dri2_util.c dri1_util.c va_nvctrl.c
-EXTRA_DIST = va_dristr.h va_dri2str.h va_dri2tokens.h va_nvctrl.h
+libva_x11_la_SOURCES = va_x11.c va_dri.c va_dri2.c va_dricommon.c dri2_util.c dri1_util.c va_nvctrl.c va_fglrx.c
+EXTRA_DIST = va_dristr.h va_dri2str.h va_dri2tokens.h va_nvctrl.h va_fglrx.h
 all: all-am
 
 .SUFFIXES:
@@ -315,6 +316,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_dri.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_dri2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_dricommon.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_fglrx.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_nvctrl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/va_x11.Plo@am__quote@
 
