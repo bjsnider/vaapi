@@ -68,7 +68,7 @@ Description: Video Acceleration (VA) API for Linux -- X11 runtime
  .
  This package provides the libva-x11 library.
 
-Package: libva-glx-1
+Package: libva-glx1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- GLX runtime
@@ -83,7 +83,7 @@ Description: Video Acceleration (VA) API for Linux -- GLX runtime
  .
  This package provides the libva-glx library.
 
-Package: libva-tpi-1
+Package: libva-tpi1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- TPI runtime
