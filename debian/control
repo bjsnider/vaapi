@@ -24,6 +24,10 @@ Depends: libva1 (>= ${source:Upstream-Version}),
          libva1 (<< ${source:Upstream-Version}+1~),
          libva-x11-1 (>= ${source:Upstream-Version}),
          libva-x11-1 (<< ${source:Upstream-Version}+1~),
+         libva-tpi1 (>= ${source:Upstream-Version}),
+         libva-tpi1 (<< ${source:Upstream-Version}+1~),
+         libva-glx1 (>= ${source:Upstream-Version}),
+         libva-glx1 (<< ${source:Upstream-Version}+1~),
          ${shlibs:Depends},
          ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- development files
