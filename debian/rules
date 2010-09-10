@@ -14,3 +14,6 @@ CONFIGURE_OPTIONS ?= --prefix=/usr $(I965_DRIVER)
 override_dh_auto_configure:
 	dh_testdir
 	./configure $(CONFIGURE_OPTIONS)
+
+get-orig-source:
+	$(dir $_)libva-get-orig-source
