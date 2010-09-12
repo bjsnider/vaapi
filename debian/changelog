@@ -1,4 +1,4 @@
-libva (1.0.4-1) UNRELEASED; urgency=low
+libva (1.0.4-1) experimental; urgency=low
 
   * New upstream release.
   * Fix bad names for library packages.
