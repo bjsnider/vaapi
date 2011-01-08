@@ -639,4 +639,430 @@ struct i965_cc_unit_state
    } cc7;
 };
 
+struct i965_sampler_8x8
+{
+    struct {
+        unsigned int pad0:16;
+        unsigned int chroma_key_index:2;
+        unsigned int chroma_key_enable:1;
+        unsigned int pad1:8;
+        unsigned int ief_filter_size:1;
+        unsigned int ief_filter_type:1;
+        unsigned int ief_bypass:1;
+        unsigned int pad2:1;
+        unsigned int avs_filter_type:1;
+    } dw0;
+
+    struct {
+        unsigned int pad0:5;
+        unsigned int sampler_8x8_state_pointer:27;
+    } dw1;
+    
+    struct {
+        unsigned int weak_edge_threshold:4;
+        unsigned int strong_edge_threshold:4;
+        unsigned int global_noise_estimation:8;
+        unsigned int pad0:16;
+    } dw2;
+
+    struct {
+        unsigned int r3x_coefficient:5;
+        unsigned int pad0:1;
+        unsigned int r3c_coefficient:5;
+        unsigned int pad1:3;
+        unsigned int gain_factor:6;
+        unsigned int non_edge_weight:3;
+        unsigned int pad2:1;
+        unsigned int regular_weight:3;
+        unsigned int pad3:1;
+        unsigned int strong_edge_weight:3;
+        unsigned int pad4:1;
+    } dw3;
+
+    struct {
+        unsigned int pad0:2;
+        unsigned int mr_boost:1;
+        unsigned int mr_threshold:4;
+        unsigned int steepness_boost:1;
+        unsigned int steepness_threshold:4;
+        unsigned int pad1:2;
+        unsigned int r5x_coefficient:5;
+        unsigned int pad2:1;
+        unsigned int r5cx_coefficient:5;
+        unsigned int pad3:1;
+        unsigned int r5c_coefficient:5;
+        unsigned int pad4:1;
+    } dw4;
+
+    struct {
+        unsigned int pwl1_point_1:8;
+        unsigned int pwl1_point_2:8;
+        unsigned int pwl1_point_3:8;
+        unsigned int pwl1_point_4:8;
+    } dw5;
+
+    struct {
+        unsigned int pwl1_point_5:8;
+        unsigned int pwl1_point_6:8;
+        unsigned int pwl1_r3_bias_0:8;
+        unsigned int pwl1_r3_bias_1:8;
+    } dw6;
+
+    struct {
+        unsigned int pwl1_r3_bias_2:8;
+        unsigned int pwl1_r3_bias_3:8;
+        unsigned int pwl1_r3_bias_4:8;
+        unsigned int pwl1_r3_bias_5:8;
+    } dw7;
+
+    struct {
+        unsigned int pwl1_r3_bias_6:8;
+        unsigned int pwl1_r5_bias_0:8;
+        unsigned int pwl1_r5_bias_1:8;
+        unsigned int pwl1_r5_bias_2:8;
+    } dw8;
+
+    struct {
+        unsigned int pwl1_r5_bias_3:8;
+        unsigned int pwl1_r5_bias_4:8;
+        unsigned int pwl1_r5_bias_5:8;
+        unsigned int pwl1_r5_bias_6:8;
+    } dw9;
+
+    struct {
+        int pwl1_r3_slope_0:8;
+        int pwl1_r3_slope_1:8;
+        int pwl1_r3_slope_2:8;
+        int pwl1_r3_slope_3:8;
+    } dw10;
+
+    struct {
+        int pwl1_r3_slope_4:8;
+        int pwl1_r3_slope_5:8;
+        int pwl1_r3_slope_6:8;
+        int pwl1_r5_slope_0:8;
+    } dw11;
+
+    struct {
+        int pwl1_r5_slope_1:8;
+        int pwl1_r5_slope_2:8;
+        int pwl1_r5_slope_3:8;
+        int pwl1_r5_slope_4:8;
+    } dw12;
+
+    struct {
+        int pwl1_r5_slope_5:8;
+        int pwl1_r5_slope_6:8;
+        unsigned int limiter_boost:4;
+        unsigned int pad0:4;
+        unsigned int minimum_limiter:4;
+        unsigned int maximum_limiter:4;
+    } dw13;
+
+    struct {
+        unsigned int pad0:8;
+        unsigned int clip_limiter:10;
+        unsigned int pad1:14;
+    } dw14;
+
+    unsigned int dw15; /* Just a pad */
+};
+
+struct i965_sampler_8x8_coefficient
+{
+    struct {
+        int table_0x_filter_c0:8;
+        int table_0x_filter_c1:8;
+        int table_0x_filter_c2:8;
+        int table_0x_filter_c3:8;
+    } dw0;
+
+    struct {
+        int table_0x_filter_c4:8;
+        int table_0x_filter_c5:8;
+        int table_0x_filter_c6:8;
+        int table_0x_filter_c7:8;
+    } dw1;
+
+    struct {
+        int table_0y_filter_c0:8;
+        int table_0y_filter_c1:8;
+        int table_0y_filter_c2:8;
+        int table_0y_filter_c3:8;
+    } dw2;
+
+    struct {
+        int table_0y_filter_c4:8;
+        int table_0y_filter_c5:8;
+        int table_0y_filter_c6:8;
+        int table_0y_filter_c7:8;
+    } dw3;
+
+    struct {
+        int pad0:16;
+        int table_1x_filter_c2:8;
+        int table_1x_filter_c3:8;
+    } dw4;
+
+    struct {
+        int table_1x_filter_c4:8;
+        int table_1x_filter_c5:8;
+        int pad0:16;
+    } dw5;
+
+    struct {
+        int pad0:16;
+        int table_1y_filter_c2:8;
+        int table_1y_filter_c3:8;
+    } dw6;
+
+    struct {
+        int table_1y_filter_c4:8;
+        int table_1y_filter_c5:8;
+        int pad0:16;
+    } dw7;
+};
+
+struct i965_sampler_8x8_state
+{
+    struct i965_sampler_8x8_coefficient coefficients[17];
+
+    struct {
+        unsigned int transition_area_with_8_pixels:3;
+        unsigned int pad0:1;
+        unsigned int transition_area_with_4_pixels:3;
+        unsigned int pad1:1;
+        unsigned int max_derivative_8_pixels:8;
+        unsigned int max_derivative_4_pixels:8;
+        unsigned int default_sharpness_level:8;
+    } dw136;
+
+    struct {
+        unsigned int bit_field_name:1;
+        unsigned int adaptive_filter_for_all_channel:1;
+        unsigned int pad0:19;
+        unsigned int bypass_y_adaptive_filtering:1;
+        unsigned int bypass_x_adaptive_filtering:1;
+        unsigned int pad1:9;
+    } dw137;
+};
+
+struct i965_surface_state2
+{
+    struct {
+        unsigned int surface_base_address;
+    } ss0;
+
+    struct {
+        unsigned int cbcr_pixel_offset_v_direction:2;
+        unsigned int pad0:4;
+        unsigned int width:13;
+        unsigned int height:13;
+    } ss1;
+
+    struct {
+        unsigned int tile_walk:1;
+        unsigned int tiled_surface:1;
+        unsigned int half_pitch_for_chroma:1;
+        unsigned int pitch:17;
+        unsigned int pad0:2;
+        unsigned int surface_object_control_data:4;
+        unsigned int pad1:1;
+        unsigned int interleave_chroma:1;
+        unsigned int surface_format:4;
+    } ss2;
+
+    struct {
+        unsigned int y_offset_for_cb:13;
+        unsigned int pad0:3;
+        unsigned int x_offset_for_cb:13;
+        unsigned int pad1:3;
+    } ss3;
+
+    struct {
+        unsigned int y_offset_for_cr:13;
+        unsigned int pad0:3;
+        unsigned int x_offset_for_cr:13;
+        unsigned int pad1:3;
+    } ss4;
+};
+
+struct i965_sampler_dndi
+{
+    struct {
+        unsigned int denoise_asd_threshold:8;
+        unsigned int denoise_history_delta:8;
+        unsigned int denoise_maximum_history:8;
+        unsigned int denoise_stad_threshold:8;
+    } dw0;
+
+    struct {
+        unsigned int denoise_threshold_for_sum_of_complexity_measure:8;
+        unsigned int denoise_moving_pixel_threshold:5;
+        unsigned int stmm_c2:3;
+        unsigned int low_temporal_difference_threshold:6;
+        unsigned int pad0:2;
+        unsigned int temporal_difference_threshold:6;
+        unsigned int pad1:2;
+    } dw1;
+
+    struct {
+        unsigned int block_noise_estimate_noise_threshold:8;
+        unsigned int block_noise_estimate_edge_threshold:8; 
+        unsigned int denoise_edge_threshold:8;
+        unsigned int good_neighbor_threshold:8;
+   } dw2;
+
+    struct {
+        unsigned int maximum_stmm:8;
+        unsigned int multipler_for_vecm:6;
+        unsigned int pad0:2;
+        unsigned int blending_constant_across_time_for_small_values_of_stmm:8;
+        unsigned int blending_constant_across_time_for_large_values_of_stmm:7;
+        unsigned int stmm_blending_constant_select:1;
+    } dw3;
+
+    struct {
+        unsigned int sdi_delta:8;
+        unsigned int sdi_threshold:8;
+        unsigned int stmm_output_shift:4;
+        unsigned int stmm_shift_up:2;
+        unsigned int stmm_shift_down:2;
+        unsigned int minimum_stmm:8;
+    } dw4;
+
+    struct {
+        unsigned int fmd_temporal_difference_threshold:8;
+        unsigned int sdi_fallback_mode_2_constant:8;
+        unsigned int sdi_fallback_mode_1_t2_constant:8;
+        unsigned int sdi_fallback_mode_1_t1_constant:8;
+    } dw5;
+
+    struct {
+        unsigned int dn_enable:1;
+        unsigned int di_enable:1;
+        unsigned int di_partial:1;
+        unsigned int dndi_top_first:1;
+        unsigned int dndi_stream_id:1;
+        unsigned int dndi_first_frame:1;
+        unsigned int progressive_dn:1;
+        unsigned int pad0:1;
+        unsigned int fmd_tear_threshold:6;
+        unsigned int pad1:2;
+        unsigned int fmd2_vertical_difference_threshold:8;
+        unsigned int fmd1_vertical_difference_threshold:8;
+    } dw6;
+
+    struct {
+        unsigned int pad0:8;
+        unsigned int fmd_for_1st_field_of_current_frame:2;
+        unsigned int pad1:6;
+        unsigned int fmd_for_2nd_field_of_previous_frame:2;
+        unsigned int vdi_walker_enable:1;
+        unsigned int pad2:4;
+        unsigned int column_width_minus1:9;
+    } dw7;
+};
+
+
+struct gen6_blend_state
+{
+    struct {
+        unsigned int dest_blend_factor:5;
+        unsigned int source_blend_factor:5;
+        unsigned int pad3:1;
+        unsigned int blend_func:3;
+        unsigned int pad2:1;
+        unsigned int ia_dest_blend_factor:5;
+        unsigned int ia_source_blend_factor:5;
+        unsigned int pad1:1;
+        unsigned int ia_blend_func:3;
+        unsigned int pad0:1;
+        unsigned int ia_blend_enable:1;
+        unsigned int blend_enable:1;
+    } blend0;
+
+    struct {
+        unsigned int post_blend_clamp_enable:1;
+        unsigned int pre_blend_clamp_enable:1;
+        unsigned int clamp_range:2;
+        unsigned int pad0:4;
+        unsigned int x_dither_offset:2;
+        unsigned int y_dither_offset:2;
+        unsigned int dither_enable:1;
+        unsigned int alpha_test_func:3;
+        unsigned int alpha_test_enable:1;
+        unsigned int pad1:1;
+        unsigned int logic_op_func:4;
+        unsigned int logic_op_enable:1;
+        unsigned int pad2:1;
+        unsigned int write_disable_b:1;
+        unsigned int write_disable_g:1;
+        unsigned int write_disable_r:1;
+        unsigned int write_disable_a:1;
+        unsigned int pad3:1;
+        unsigned int alpha_to_coverage_dither:1;
+        unsigned int alpha_to_one:1;
+        unsigned int alpha_to_coverage:1;
+    } blend1;
+};
+
+struct gen6_color_calc_state
+{
+    struct {
+        unsigned int alpha_test_format:1;
+        unsigned int pad0:14;
+        unsigned int round_disable:1;
+        unsigned int bf_stencil_ref:8;
+        unsigned int stencil_ref:8;
+    } cc0;
+
+    union {
+        float alpha_ref_f;
+        struct {
+            unsigned int ui:8;
+            unsigned int pad0:24;
+        } alpha_ref_fi;
+    } cc1;
+
+    float constant_r;
+    float constant_g;
+    float constant_b;
+    float constant_a;
+};
+
+struct gen6_depth_stencil_state
+{
+    struct {
+        unsigned int pad0:3;
+        unsigned int bf_stencil_pass_depth_pass_op:3;
+        unsigned int bf_stencil_pass_depth_fail_op:3;
+        unsigned int bf_stencil_fail_op:3;
+        unsigned int bf_stencil_func:3;
+        unsigned int bf_stencil_enable:1;
+        unsigned int pad1:2;
+        unsigned int stencil_write_enable:1;
+        unsigned int stencil_pass_depth_pass_op:3;
+        unsigned int stencil_pass_depth_fail_op:3;
+        unsigned int stencil_fail_op:3;
+        unsigned int stencil_func:3;
+        unsigned int stencil_enable:1;
+    } ds0;
+
+    struct {
+        unsigned int bf_stencil_write_mask:8;
+        unsigned int bf_stencil_test_mask:8;
+        unsigned int stencil_write_mask:8;
+        unsigned int stencil_test_mask:8;
+    } ds1;
+
+    struct {
+        unsigned int pad0:26;
+        unsigned int depth_write_enable:1;
+        unsigned int depth_test_func:3;
+        unsigned int pad1:1;
+        unsigned int depth_test_enable:1;
+    } ds2;
+};
+
 #endif /* _I965_STRUCTS_H_ */

@@ -7,11 +7,11 @@
 # distribute, sub license, and/or sell copies of the Software, and to
 # permit persons to whom the Software is furnished to do so, subject to
 # the following conditions:
-# 
+#
 # The above copyright notice and this permission notice (including the
 # next paragraph) shall be included in all copies or substantial portions
 # of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 # OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
@@ -29,7 +29,7 @@ m4_define([libva_version],
           [libva_major_version.libva_minor_version.libva_micro_version])
 
 # if the library source code has changed, increment revision
-m4_define([libva_lt_revision], [4])
+m4_define([libva_lt_revision], [7])
 # if any interface was added/removed/changed, then inc current, reset revision
 m4_define([libva_lt_current], [1])
 # if any interface was added since last public release, then increment age
@@ -42,6 +42,7 @@ AC_CONFIG_SRCDIR([Makefile.am])
 AM_INIT_AUTOMAKE([dist-bzip2])
 
 AM_CONFIG_HEADER([config.h])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 LIBVA_MAJOR_VERSION=libva_major_version
 LIBVA_MINOR_VERSION=libva_minor_version
@@ -100,12 +101,12 @@ PKG_CHECK_MODULES([XEXT],[xext])
 PKG_CHECK_MODULES([XFIXES], [xfixes])
 PKG_CHECK_MODULES([DRM], [libdrm])
 
-PKG_CHECK_MODULES(GEN4ASM, [intel-gen4asm >= 1.0], [gen4asm=yes], [gen4asm=no])
+PKG_CHECK_MODULES(GEN4ASM, [intel-gen4asm >= 1.1], [gen4asm=yes], [gen4asm=no])
 AM_CONDITIONAL(HAVE_GEN4ASM, test x$gen4asm = xyes)
 
-# Check for libdrm >= 2.4.21 (needed for i965_drv_video.so)
-if test x$enable_i965_driver = xyes && ! $PKG_CONFIG --atleast-version=2.4.21 libdrm; then
-    AC_MSG_WARN([libdrm < 2.4.21 found, disabling build of i965 video driver])
+# Check for libdrm >= 2.4.23 (needed for i965_drv_video.so)
+if test x$enable_i965_driver = xyes && ! $PKG_CONFIG --atleast-version=2.4.23 libdrm; then
+    AC_MSG_WARN([libdrm < 2.4.23 found, disabling build of i965 video driver])
     enable_i965_driver=no
 fi
 AM_CONDITIONAL(BUILD_I965_DRIVER, test x$enable_i965_driver = xyes)
@@ -163,6 +164,7 @@ AC_OUTPUT([
 	i965_drv_video/shaders/mpeg2/Makefile
 	i965_drv_video/shaders/mpeg2/vld/Makefile
 	i965_drv_video/shaders/render/Makefile
+	i965_drv_video/shaders/post_processing/Makefile
 	test/Makefile
 	test/basic/Makefile
 	test/decode/Makefile
@@ -171,5 +173,28 @@ AC_OUTPUT([
 	libva.pc
 	libva-x11.pc
 	libva-glx.pc
+	libva-tpi.pc
 ])
+
+# Print a small summary
+
+echo ""
+echo "libva - ${LIBVA_VERSION}"
+echo ""
+
+echo " • Global :"
+echo "     Prefix: ${prefix}"
+echo ""
+
+AS_IF([test x$enable_i965_driver = xyes], [DRIVERS="i965 $DRIVERS"]) 
+AS_IF([test x$enable_dummy_driver = xyes], [DRIVERS="dummy $DRIVERS"])
+
+echo " • Drivers: ${DRIVERS}"
+
+AS_IF([test x$USE_GLX = xyes], [BACKENDS="glx $BACKENDS"])
+BACKENDS="x11 $BACKENDS"
+AS_IF([test x$enable_dummy_backend = xyes], [BACKENDS="dummy 
+$BACKENDS"])
+
+echo " • Winsys : ${BACKENDS}"
 
