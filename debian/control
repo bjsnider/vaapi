@@ -46,6 +46,7 @@ Description: Video Acceleration (VA) API for Linux -- development files
 Package: libva1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Breaks: vlc-nox (<< 1.1.5-3)
 Description: Video Acceleration (VA) API for Linux -- runtime
  Video Acceleration API (VA API) is a library ("libVA") and API specification
  which enables and provides access to graphics hardware (GPU) acceleration for
