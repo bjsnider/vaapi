@@ -1,7 +1,7 @@
 Source: libva
 Priority: optional
 Maintainer: Debian Multimedia Maintainers <pkg-multimedia-maintainers@lists.alioth.debian.org>
-Uploaders: Andres Mejia <mcitadel@gmail.com>
+Uploaders: Andres Mejia <mcitadel@gmail.com>, Reinhard Tartler <siretart@tauware.de>
 Build-Depends: debhelper (>= 7.0.50),
                quilt (>= 0.46-7),
                pkg-config,
