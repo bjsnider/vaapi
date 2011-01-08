@@ -9,7 +9,7 @@ I965_DRIVER=$(shell dpkg-architecture -a$(DEB_HOST_ARCH) -iany-amd64 || \
 CONFIGURE_OPTIONS ?= --prefix=/usr $(I965_DRIVER)
 
 %:
-	dh --with quilt $@
+	dh --with quilt,autoreconf $@
 
 override_dh_auto_configure:
 	dh_testdir
