@@ -27,7 +27,7 @@ on ubuntu natty
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
-+  $(top_builddir)/va/$(libvacorelib) -lX11
++  $(top_builddir)/va/$(libvacorelib) $(X11_LIBS)
  
  test_01_LDADD = $(TEST_LIBS)
  test_01_SOURCES = test_01.c
@@ -39,7 +39,7 @@ on ubuntu natty
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
-+  $(top_builddir)/va/$(libvacorelib) -lX11
++  $(top_builddir)/va/$(libvacorelib) $(X11_LIBS)
  
  mpeg2vldemo_LDADD = $(TEST_LIBS)
  mpeg2vldemo_SOURCES = mpeg2vldemo.c
@@ -51,7 +51,7 @@ on ubuntu natty
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
-+  $(top_builddir)/va/$(libvacorelib) -lX11
++  $(top_builddir)/va/$(libvacorelib) $(X11_LIBS)
  
  h264encode_LDADD = $(TEST_LIBS)
  h264encode_SOURCES = h264encode.c
@@ -64,7 +64,7 @@ on ubuntu natty
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) -lpthread
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
 +  $(top_builddir)/va/$(libvacorelib) \
-+  -lX11 -lpthread
++  $(X11_LIBS)
  
  putsurface_LDADD = $(TEST_LIBS)
  putsurface_SOURCES = putsurface.c
