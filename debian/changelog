@@ -1,3 +1,9 @@
+libva (1.0.4-2) UNRELEASED; urgency=low
+
+  * prepare new upload
+
+ -- Reinhard Tartler <siretart@tauware.de>  Sat, 08 Jan 2011 11:58:19 +0100
+
 libva (1.0.4-1) experimental; urgency=low
 
   * New upstream release.
