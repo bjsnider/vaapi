@@ -1,3 +1,3 @@
 version=3
-# we look for urls like http://cgit.freedesktop.org/libva/snapshot/libva-1.0.5.tar.gz
-http://cgit.freedesktop.org/libva/ /libva/snapshot/libva-([\d+\.]+)\.tar\.gz
+# we look for urls like http://cgit.freedesktop.org/libva/snapshot/libva-1.0.5.tar.bz2
+http://cgit.freedesktop.org/libva/ /libva/snapshot/libva-([\d+\.]+)\.tar\.bz2
