@@ -1,8 +1,17 @@
-libva (1.0.7-1) UNRELEASED; urgency=low
+libva (1.0.7-1) experimental; urgency=low
 
-  * prepare new upload
-
- -- Reinhard Tartler <siretart@tauware.de>  Sat, 08 Jan 2011 11:58:19 +0100
+  * New upstream version (Closes: #601665)
+  * Fixes crashes (Closes: #589367, #599329)
+  * add myself as uploader
+  * replace autoreconf.patch with dh-autoreconf
+  * update library dependencies for test programs, fixes FTBFS
+  * fix watchfile
+  * tighten dependency on libdrm-dev
+  * Force upgrade of vlc to avoid errors while loading libva
+    (Closes: #603612)
+  * Switch to Format 3.0 (quilt)
+  
+ -- Reinhard Tartler <siretart@tauware.de>  Sun, 09 Jan 2011 16:46:57 +0100
 
 libva (1.0.4-1) experimental; urgency=low
 
