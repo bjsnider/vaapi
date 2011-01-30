@@ -29,7 +29,7 @@ m4_define([libva_version],
           [libva_major_version.libva_minor_version.libva_micro_version])
 
 # if the library source code has changed, increment revision
-m4_define([libva_lt_revision], [7])
+m4_define([libva_lt_revision], [8])
 # if any interface was added/removed/changed, then inc current, reset revision
 m4_define([libva_lt_current], [1])
 # if any interface was added since last public release, then increment age
@@ -170,6 +170,7 @@ AC_OUTPUT([
 	test/decode/Makefile
 	test/putsurface/Makefile
 	test/encode/Makefile
+	test/vainfo/Makefile
 	libva.pc
 	libva-x11.pc
 	libva-glx.pc
