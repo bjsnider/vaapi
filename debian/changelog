@@ -1,3 +1,9 @@
+libva (1.0.8-1) experimental; urgency=low
+
+  * New upstream version.
+
+ -- Andres Mejia <mcitadel@gmail.com>  Sun, 30 Jan 2011 11:31:02 -0500
+
 libva (1.0.7-1) experimental; urgency=low
 
   * New upstream version (Closes: #601665)
