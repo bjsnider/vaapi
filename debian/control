@@ -104,7 +104,7 @@ Description: Video Acceleration (VA) API for Linux -- TPI runtime
  This package provides the libva-tpi library.
 
 Package: i965-va-driver
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Provides: va-driver
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Video Acceleration (VA) API for Linux -- i965 VA driver
