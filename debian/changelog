@@ -1,8 +1,12 @@
 libva (1.0.8-3) unstable; urgency=low
 
-  * start new upload
+  [ Artur Rona ]
+  * Update library dependencies to fix FTBFS properly.
 
- -- Reinhard Tartler <siretart@tauware.de>  Sun, 13 Feb 2011 14:31:17 +0100
+  [ Reinhard Tartler ]
+  * Disable i965 driver on hurd-i386, Closes: #613102
+
+ -- Reinhard Tartler <siretart@tauware.de>  Sun, 13 Feb 2011 19:01:16 +0100
 
 libva (1.0.8-2) unstable; urgency=low
 
