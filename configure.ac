@@ -22,14 +22,14 @@
 
 # libva package version number, (as distinct from shared library version)
 m4_define([libva_major_version], [0])
-m4_define([libva_minor_version], [31])
-m4_define([libva_micro_version], [1])
+m4_define([libva_minor_version], [32])
+m4_define([libva_micro_version], [0])
 
 m4_define([libva_version],
           [libva_major_version.libva_minor_version.libva_micro_version])
 
 # if the library source code has changed, increment revision
-m4_define([libva_lt_revision], [8])
+m4_define([libva_lt_revision], [12])
 # if any interface was added/removed/changed, then inc current, reset revision
 m4_define([libva_lt_current], [1])
 # if any interface was added since last public release, then increment age
@@ -135,6 +135,18 @@ AC_SUBST(GL_DEPS_CFLAGS)
 AC_SUBST(GL_DEPS_LIBS)
 AM_CONDITIONAL(USE_GLX, test "$USE_GLX" = "yes")
 
+# TBD: Check for EGL
+USE_EGL="yes"
+AM_CONDITIONAL(USE_EGL, test "$USE_EGL" = "yes")
+
+
+# Make sure drivers use the correctly versioned __vaDriverInit*() function name
+VA_DRIVER_INIT_FUNC="__vaDriverInit_${LIBVA_MAJOR_VERSION}_${LIBVA_MINOR_VERSION}"
+AC_DEFINE_UNQUOTED([VA_DRIVER_INIT_FUNC], [$VA_DRIVER_INIT_FUNC],
+    [Defined to the versioned __vaDriverInit function name])
+AC_DEFINE_UNQUOTED([VA_DRIVER_INIT_FUNC_S], ["$VA_DRIVER_INIT_FUNC"],
+    [Defined to the versioned __vaDriverInit function name (in string form)])
+
 # We only need the headers, we don't link against the DRM libraries
 LIBVA_CFLAGS="$DRM_CFLAGS"
 AC_SUBST(LIBVA_CFLAGS)
@@ -155,6 +167,7 @@ AC_OUTPUT([
 	va/va_version.h
 	va/x11/Makefile
 	va/glx/Makefile
+	va/egl/Makefile
 	va/dummy/Makefile
 	dummy_drv_video/Makefile
 	i965_drv_video/Makefile
@@ -174,6 +187,7 @@ AC_OUTPUT([
 	libva.pc
 	libva-x11.pc
 	libva-glx.pc
+	libva-egl.pc
 	libva-tpi.pc
 ])
 
@@ -193,6 +207,8 @@ AS_IF([test x$enable_dummy_driver = xyes], [DRIVERS="dummy $DRIVERS"])
 echo " • Drivers: ${DRIVERS}"
 
 AS_IF([test x$USE_GLX = xyes], [BACKENDS="glx $BACKENDS"])
+AS_IF([test x$USE_EGL = xyes], [BACKENDS="egl $BACKENDS"])
+
 BACKENDS="x11 $BACKENDS"
 AS_IF([test x$enable_dummy_backend = xyes], [BACKENDS="dummy 
 $BACKENDS"])

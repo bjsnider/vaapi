@@ -36,9 +36,13 @@ if USE_GLX
 pcfiles += libva-glx.pc
 endif
 
+if USE_EGL
+pcfiles += libva-egl.pc
+endif
+
 pkgconfigdir = @pkgconfigdir@
 pkgconfig_DATA = $(pcfiles)
 
-EXTRA_DIST = libva.pc.in libva-tpi.pc.in libva-x11.pc.in libva-glx.pc.in
+EXTRA_DIST = libva.pc.in libva-tpi.pc.in libva-x11.pc.in libva-glx.pc.in libva-egl.pc.in
 
 CLEANFILES = $(pcfiles)

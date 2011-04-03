@@ -96,6 +96,12 @@ struct object_context
 
 #define SURFACE_REFERENCED      (1 << 0)
 #define SURFACE_DISPLAYED       (1 << 1)
+#define SURFACE_DERIVED         (1 << 2)
+#define SURFACE_REF_DIS_MASK    ((SURFACE_REFERENCED) | \
+                                 (SURFACE_DISPLAYED))
+#define SURFACE_ALL_MASK        ((SURFACE_REFERENCED) | \
+                                 (SURFACE_DISPLAYED) |  \
+                                 (SURFACE_DERIVED))
 
 struct object_surface 
 {
@@ -134,6 +140,7 @@ struct object_image
     VAImage image;
     dri_bo *bo;
     unsigned int *palette;
+    VASurfaceID derived_surface;
 };
 
 struct object_subpic 
@@ -160,6 +167,7 @@ struct i965_driver_data
     struct object_heap subpic_heap;
     struct i965_media_state media_state;
     struct i965_render_state render_state;
+    void *pp_context;
 };
 
 #define NEW_CONFIG_ID() object_heap_allocate(&i965->config_heap);

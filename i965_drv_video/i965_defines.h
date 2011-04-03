@@ -27,6 +27,13 @@
 #define CMD_BSD_IND_OBJ_BASE_ADDR               CMD(2, 4, 4)
 #define CMD_AVC_BSD_OBJECT                      CMD(2, 4, 8)
 
+#define CMD_MEDIA_VFE_STATE                     CMD(2, 0, 0)
+#define CMD_MEDIA_CURBE_LOAD                    CMD(2, 0, 1)
+#define CMD_MEDIA_INTERFACE_DESCRIPTOR_LOAD     CMD(2, 0, 2)
+#define CMD_MEDIA_GATEWAY_STATE                 CMD(2, 0, 3)
+#define CMD_MEDIA_STATE_FLUSH                   CMD(2, 0, 4)
+#define CMD_MEDIA_OBJECT_WALKER                 CMD(2, 1, 3)
+
 #define CMD_PIPELINED_POINTERS                  CMD(3, 0, 0)
 #define CMD_BINDING_TABLE_POINTERS              CMD(3, 0, 1)
 # define GEN6_BINDING_TABLE_MODIFY_PS           (1 << 12)/* for GEN6 */
@@ -118,6 +125,11 @@
 #define GEN6_3DSTATE_CONSTANT_GS          	CMD(3, 0, 0x16)
 #define GEN6_3DSTATE_CONSTANT_PS          	CMD(3, 0, 0x17)
 
+# define GEN6_3DSTATE_CONSTANT_BUFFER_3_ENABLE  (1 << 15)
+# define GEN6_3DSTATE_CONSTANT_BUFFER_2_ENABLE  (1 << 14)
+# define GEN6_3DSTATE_CONSTANT_BUFFER_1_ENABLE  (1 << 13)
+# define GEN6_3DSTATE_CONSTANT_BUFFER_0_ENABLE  (1 << 12)
+
 #define GEN6_3DSTATE_SAMPLE_MASK		CMD(3, 0, 0x18)
 
 #define GEN6_3DSTATE_MULTISAMPLE		CMD(3, 1, 0x0d)
@@ -158,6 +170,12 @@
 #define MFX_MPEG2_QM_STATE                      MFX(2, 3, 0, 1)
 
 #define MFD_MPEG2_BSD_OBJECT                    MFX(2, 3, 1, 8)
+
+#define MFX_VC1_PIC_STATE                       MFX(2, 2, 0, 0)
+#define MFX_VC1_PRED_PIPE_STATE                 MFX(2, 2, 0, 1)
+#define MFX_VC1_DIRECTMODE_STATE                MFX(2, 2, 0, 2)
+
+#define MFD_VC1_BSD_OBJECT                      MFX(2, 2, 1, 8)
 
 #define I965_DEPTHFORMAT_D32_FLOAT              1
 

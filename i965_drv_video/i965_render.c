@@ -685,10 +685,16 @@ i965_render_src_surfaces_state(VADriverContextP ctx,
         i965_render_src_surface_state(ctx, 3, region, w * h, rw / 2, rh / 2, w, I965_SURFACEFORMAT_R8G8_UNORM); /* UV */
         i965_render_src_surface_state(ctx, 4, region, w * h, rw / 2, rh / 2, w, I965_SURFACEFORMAT_R8G8_UNORM);
     } else {
-        i965_render_src_surface_state(ctx, 3, region, w * h, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM); /* U */
-        i965_render_src_surface_state(ctx, 4, region, w * h, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);
-        i965_render_src_surface_state(ctx, 5, region, w * h + w * h / 4, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);     /* V */
-        i965_render_src_surface_state(ctx, 6, region, w * h + w * h / 4, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);
+        int u3 = 3, u4 = 4, v5 = 5, v6 = 6;
+
+        if (obj_surface->flags & SURFACE_DERIVED) {
+            u3 = 5, u4 = 6, v5 = 3, v6 = 4;
+        }
+        
+        i965_render_src_surface_state(ctx, u3, region, w * h, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM); /* U */
+        i965_render_src_surface_state(ctx, u4, region, w * h, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);
+        i965_render_src_surface_state(ctx, v5, region, w * h + w * h / 4, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);     /* V */
+        i965_render_src_surface_state(ctx, v6, region, w * h + w * h / 4, rw / 2, rh / 2, w / 2, I965_SURFACEFORMAT_R8_UNORM);
     }
 }
 
@@ -1415,11 +1421,6 @@ i965_render_put_surface(VADriverContextP ctx,
                         unsigned short desth,
                         unsigned int flag)
 {
-    i965_post_processing(ctx, surface,
-                         srcx, srcy, srcw, srch,
-                         destx, desty, destw, desth,
-                         flag);
-
     i965_render_initialize(ctx);
     i965_surface_render_state_setup(ctx, surface,
                             srcx, srcy, srcw, srch,
@@ -1595,6 +1596,7 @@ gen6_render_setup_states(VADriverContextP ctx,
     gen6_render_color_calc_state(ctx);
     gen6_render_blend_state(ctx);
     gen6_render_depth_stencil_state(ctx);
+    i965_render_upload_constants(ctx);
     i965_render_upload_vertex(ctx, surface,
                               srcx, srcy, srcw, srch,
                               destx, desty, destw, desth);
@@ -1797,9 +1799,16 @@ gen6_emit_sf_state(VADriverContextP ctx)
 static void 
 gen6_emit_wm_state(VADriverContextP ctx, int kernel)
 {
-    /* disable WM constant buffer */
-    OUT_BATCH(ctx, GEN6_3DSTATE_CONSTANT_PS | (5 - 2));
-    OUT_BATCH(ctx, 0);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct i965_render_state *render_state = &i965->render_state;
+
+    OUT_BATCH(ctx, GEN6_3DSTATE_CONSTANT_PS |
+              GEN6_3DSTATE_CONSTANT_BUFFER_0_ENABLE |
+              (5 - 2));
+    OUT_RELOC(ctx, 
+              render_state->curbe.bo,
+              I915_GEM_DOMAIN_INSTRUCTION, 0,
+              0);
     OUT_BATCH(ctx, 0);
     OUT_BATCH(ctx, 0);
     OUT_BATCH(ctx, 0);
@@ -2017,6 +2026,11 @@ intel_render_put_surface(VADriverContextP ctx,
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
 
+    i965_post_processing(ctx, surface,
+                         srcx, srcy, srcw, srch,
+                         destx, desty, destw, desth,
+                         flag);
+
     if (IS_GEN6(i965->intel.device_id))
         gen6_render_put_surface(ctx, surface,
                                 srcx, srcy, srcw, srch,
@@ -2093,8 +2107,6 @@ i965_render_init(VADriverContextP ctx)
     assert(render_state->curbe.bo);
     render_state->curbe.upload = 0;
 
-    i965_post_processing_once_init(ctx);
-
     return True;
 }
 
@@ -2104,8 +2116,6 @@ i965_render_terminate(VADriverContextP ctx)
     int i;
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_render_state *render_state = &i965->render_state;
-
-    i965_post_processing_terminate(ctx);
 
     dri_bo_unreference(render_state->curbe.bo);
     render_state->curbe.bo = NULL;
