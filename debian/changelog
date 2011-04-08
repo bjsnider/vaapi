@@ -1,7 +1,8 @@
 libva (1.0.12-1) unstable; urgency=low
 
   * New upstream release.
-
+  * bump shlibs to tightend dependencies of i965-va-driver (Closes: #613332)
+  
  -- Reinhard Tartler <siretart@tauware.de>  Sun, 03 Apr 2011 21:16:01 +0200
 
 libva (1.0.8-3) unstable; urgency=low
