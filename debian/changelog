@@ -1,6 +1,7 @@
 libva (1.0.12-2) unstable; urgency=low
 
-  * prepare new upload
+  * Revert "remove debian/patches/kfreebsd-fixes.patch, applied upstream"
+    (Closes: #621759)
 
  -- Reinhard Tartler <siretart@tauware.de>  Sun, 17 Apr 2011 09:16:27 +0200
 
