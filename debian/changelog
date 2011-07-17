@@ -1,3 +1,9 @@
+libva (1.0.12-3) UNRELEASED; urgency=low
+
+  * Updated to my @debian.org email.
+
+ -- Andres Mejia <amejia@debian.org>  Sun, 17 Jul 2011 14:07:10 -0400
+
 libva (1.0.12-2) unstable; urgency=low
 
   * Revert "remove debian/patches/kfreebsd-fixes.patch, applied upstream"
