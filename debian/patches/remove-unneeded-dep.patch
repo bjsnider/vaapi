@@ -1,4 +1,7 @@
-Patch to remove unnecessary dependency to libva-x11 for dummy driver
+Author: Andres Mejia <mcitadel@gmail.com>
+Date: Wed Jun 2 18:30:20 2010 -0400
+Description: Patch to remove unnecessary dependency to libva-x11 for dummy driver
+
 ==========================================================================
 --- a/dummy_drv_video/Makefile.am
 +++ b/dummy_drv_video/Makefile.am
