@@ -22,12 +22,12 @@
 
 bin_PROGRAMS = mpeg2vldemo
 
-AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/src/x11
+INCLUDES = -I$(top_srcdir)
 
 TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 
 mpeg2vldemo_LDADD = $(TEST_LIBS)
-mpeg2vldemo_SOURCES = mpeg2vldemo.c
+mpeg2vldemo_SOURCES = mpeg2vldemo.cpp
 
 
 valgrind:	$(bin_PROGRAMS)

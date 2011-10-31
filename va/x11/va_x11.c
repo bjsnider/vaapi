@@ -42,40 +42,30 @@
 #include <fcntl.h>
 #include <errno.h>
 
-static VADisplayContextP pDisplayContexts = NULL;
-
 static int va_DisplayContextIsValid (
     VADisplayContextP pDisplayContext
 )
 {
-    VADisplayContextP ctx = pDisplayContexts;
-
-    while (ctx)
-    {
-	if (ctx == pDisplayContext && pDisplayContext->pDriverContext)
-	    return 1;
-	ctx = ctx->pNext;
-    }
-    return 0;
+    return (pDisplayContext != NULL && 
+            pDisplayContext->pDriverContext != NULL);
 }
 
 static void va_DisplayContextDestroy (
     VADisplayContextP pDisplayContext
 )
 {
-    VADisplayContextP *ctx = &pDisplayContexts;
+    VADriverContextP ctx;
+    struct dri_state *dri_state;
 
-    /* Throw away pDisplayContext */
-    while (*ctx)
-    {
-	if (*ctx == pDisplayContext)
-	{
-	    *ctx = pDisplayContext->pNext;
-	    pDisplayContext->pNext = NULL;
-	    break;
-	}
-	ctx = &((*ctx)->pNext);
-    }
+    if (pDisplayContext == NULL)
+        return;
+
+    ctx = pDisplayContext->pDriverContext;
+    dri_state = ctx->dri_state;
+
+    if (dri_state && dri_state->close)
+        dri_state->close(ctx);
+
     free(pDisplayContext->pDriverContext->dri_state);
     free(pDisplayContext->pDriverContext);
     free(pDisplayContext);
@@ -117,12 +107,12 @@ static VAStatus va_NVCTRL_GetDriverName (
     int direct_capable, driver_major, driver_minor, driver_patch;
     Bool result;
 
-    result = VA_NVCTRLQueryDirectRenderingCapable((Display *)ctx->native_dpy, ctx->x11_screen,
+    result = VA_NVCTRLQueryDirectRenderingCapable(ctx->native_dpy, ctx->x11_screen,
                                                   &direct_capable);
     if (!result || !direct_capable)
         return VA_STATUS_ERROR_UNKNOWN;
 
-    result = VA_NVCTRLGetClientDriverName((Display *)ctx->native_dpy, ctx->x11_screen,
+    result = VA_NVCTRLGetClientDriverName(ctx->native_dpy, ctx->x11_screen,
                                           &driver_major, &driver_minor,
                                           &driver_patch, driver_name);
     if (!result)
@@ -175,21 +165,10 @@ VADisplay vaGetDisplay (
 )
 {
   VADisplay dpy = NULL;
-  VADisplayContextP pDisplayContext = pDisplayContexts;
+  VADisplayContextP pDisplayContext;
 
   if (!native_dpy)
       return NULL;
-
-  while (pDisplayContext)
-  {
-      if (pDisplayContext->pDriverContext &&
-	  pDisplayContext->pDriverContext->native_dpy == (void *)native_dpy)
-      {
-          dpy = (VADisplay)pDisplayContext;
-          break;
-      }
-      pDisplayContext = pDisplayContext->pNext;
-  }
 
   if (!dpy)
   {
@@ -204,13 +183,11 @@ VADisplay vaGetDisplay (
 	  pDisplayContext->vadpy_magic = VA_DISPLAY_MAGIC;          
 
 	  pDriverContext->native_dpy       = (void *)native_dpy;
-	  pDisplayContext->pNext           = pDisplayContexts;
 	  pDisplayContext->pDriverContext  = pDriverContext;
 	  pDisplayContext->vaIsValid       = va_DisplayContextIsValid;
 	  pDisplayContext->vaDestroy       = va_DisplayContextDestroy;
 	  pDisplayContext->vaGetDriverName = va_DisplayContextGetDriverName;
           pDisplayContext->opaque          = NULL;
-	  pDisplayContexts                 = pDisplayContext;
 	  pDriverContext->dri_state 	   = dri_state;
 	  dpy                              = (VADisplay)pDisplayContext;
       }

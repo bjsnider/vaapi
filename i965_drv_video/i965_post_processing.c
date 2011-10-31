@@ -35,390 +35,198 @@
 
 #include "intel_batchbuffer.h"
 #include "intel_driver.h"
-
 #include "i965_defines.h"
+#include "i965_structs.h"
+#include "i965_drv_video.h"
 #include "i965_post_processing.h"
 #include "i965_render.h"
-#include "i965_drv_video.h"
 
 #define HAS_PP(ctx) (IS_IRONLAKE((ctx)->intel.device_id) ||     \
-                     IS_GEN6((ctx)->intel.device_id))
+                     IS_GEN6((ctx)->intel.device_id) ||         \
+                     IS_GEN7((ctx)->intel.device_id))
 
-struct pp_module
-{
-    /* kernel */
-    char *name;
-    int interface;
-    unsigned int (*bin)[4];
-    int size;
-    dri_bo *bo;
-
-    /* others */
-    void (*initialize)(VADriverContextP ctx, VASurfaceID surface, int input,
-                       unsigned short srcw, unsigned short srch,
-                       unsigned short destw, unsigned short desth);
-};
-
-static uint32_t pp_null_gen5[][4] = {
+static const uint32_t pp_null_gen5[][4] = {
 #include "shaders/post_processing/null.g4b.gen5"
 };
 
-static uint32_t pp_nv12_load_save_gen5[][4] = {
+static const uint32_t pp_nv12_load_save_gen5[][4] = {
 #include "shaders/post_processing/nv12_load_save_nv12.g4b.gen5"
 };
 
-static uint32_t pp_nv12_scaling_gen5[][4] = {
+static const uint32_t pp_nv12_scaling_gen5[][4] = {
 #include "shaders/post_processing/nv12_scaling_nv12.g4b.gen5"
 };
 
-static uint32_t pp_nv12_avs_gen5[][4] = {
+static const uint32_t pp_nv12_avs_gen5[][4] = {
 #include "shaders/post_processing/nv12_avs_nv12.g4b.gen5"
 };
 
-static uint32_t pp_nv12_dndi_gen5[][4] = {
+static const uint32_t pp_nv12_dndi_gen5[][4] = {
 #include "shaders/post_processing/nv12_dndi_nv12.g4b.gen5"
 };
 
-static void pp_null_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                               unsigned short srcw, unsigned short srch,
-                               unsigned short destw, unsigned short desth);
-static void pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                                   unsigned short srcw, unsigned short srch,
-                                   unsigned short destw, unsigned short desth);
-static void pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                                       unsigned short srcw, unsigned short srch,
-                                       unsigned short destw, unsigned short desth);
-static void pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                                         unsigned short srcw, unsigned short srch,
-                                         unsigned short destw, unsigned short desth);
-static void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                                    unsigned short srcw, unsigned short srch,
-                                    unsigned short destw, unsigned short desth);
+static void pp_null_initialize(VADriverContextP ctx,
+                               VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                               const VARectangle *src_rect, const VARectangle *dst_rect);
+static void pp_nv12_avs_initialize(VADriverContextP ctx,
+                                   VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                                   const VARectangle *src_rect, const VARectangle *dst_rect);
+static void pp_nv12_scaling_initialize(VADriverContextP ctx,
+                                       VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                                       const VARectangle *src_rect, const VARectangle *dst_rect);
+static void pp_nv12_load_save_initialize(VADriverContextP ctx,
+                                         VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                                         const VARectangle *src_rect, const VARectangle *dst_rect);
+static void pp_nv12_dndi_initialize(VADriverContextP ctx,
+                                    VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                                    const VARectangle *src_rect, const VARectangle *dst_rect);
 
 static struct pp_module pp_modules_gen5[] = {
     {
-        "NULL module (for testing)",
-        PP_NULL,
-        pp_null_gen5,
-        sizeof(pp_null_gen5),
-        NULL,
+        {
+            "NULL module (for testing)",
+            PP_NULL,
+            pp_null_gen5,
+            sizeof(pp_null_gen5),
+            NULL,
+        },
+
         pp_null_initialize,
     },
 
     {
-        "NV12 Load & Save module",
-        PP_NV12_LOAD_SAVE,
-        pp_nv12_load_save_gen5,
-        sizeof(pp_nv12_load_save_gen5),
-        NULL,
+        {
+            "NV12 Load & Save module",
+            PP_NV12_LOAD_SAVE,
+            pp_nv12_load_save_gen5,
+            sizeof(pp_nv12_load_save_gen5),
+            NULL,
+        },
+
         pp_nv12_load_save_initialize,
     },
 
     {
-        "NV12 Scaling module",
-        PP_NV12_SCALING,
-        pp_nv12_scaling_gen5,
-        sizeof(pp_nv12_scaling_gen5),
-        NULL,
+        {
+            "NV12 Scaling module",
+            PP_NV12_SCALING,
+            pp_nv12_scaling_gen5,
+            sizeof(pp_nv12_scaling_gen5),
+            NULL,
+        },
+
         pp_nv12_scaling_initialize,
     },
 
     {
-        "NV12 AVS module",
-        PP_NV12_AVS,
-        pp_nv12_avs_gen5,
-        sizeof(pp_nv12_avs_gen5),
-        NULL,
+        {
+            "NV12 AVS module",
+            PP_NV12_AVS,
+            pp_nv12_avs_gen5,
+            sizeof(pp_nv12_avs_gen5),
+            NULL,
+        },
+
         pp_nv12_avs_initialize,
     },
 
     {
-        "NV12 DNDI module",
-        PP_NV12_DNDI,
-        pp_nv12_dndi_gen5,
-        sizeof(pp_nv12_dndi_gen5),
-        NULL,
+        {
+            "NV12 DNDI module",
+            PP_NV12_DNDI,
+            pp_nv12_dndi_gen5,
+            sizeof(pp_nv12_dndi_gen5),
+            NULL,
+        },
+
         pp_nv12_dndi_initialize,
     },
 };
 
-static uint32_t pp_null_gen6[][4] = {
+static const uint32_t pp_null_gen6[][4] = {
 #include "shaders/post_processing/null.g6b"
 };
 
-static uint32_t pp_nv12_load_save_gen6[][4] = {
+static const uint32_t pp_nv12_load_save_gen6[][4] = {
 #include "shaders/post_processing/nv12_load_save_nv12.g6b"
 };
 
-static uint32_t pp_nv12_scaling_gen6[][4] = {
+static const uint32_t pp_nv12_scaling_gen6[][4] = {
 #include "shaders/post_processing/nv12_scaling_nv12.g6b"
 };
 
-static uint32_t pp_nv12_avs_gen6[][4] = {
+static const uint32_t pp_nv12_avs_gen6[][4] = {
 #include "shaders/post_processing/nv12_avs_nv12.g6b"
 };
 
-static uint32_t pp_nv12_dndi_gen6[][4] = {
+static const uint32_t pp_nv12_dndi_gen6[][4] = {
 #include "shaders/post_processing/nv12_dndi_nv12.g6b"
 };
 
 static struct pp_module pp_modules_gen6[] = {
     {
-        "NULL module (for testing)",
-        PP_NULL,
-        pp_null_gen6,
-        sizeof(pp_null_gen6),
-        NULL,
+        {
+            "NULL module (for testing)",
+            PP_NULL,
+            pp_null_gen6,
+            sizeof(pp_null_gen6),
+            NULL,
+        },
+
         pp_null_initialize,
     },
 
     {
-        "NV12 Load & Save module",
-        PP_NV12_LOAD_SAVE,
-        pp_nv12_load_save_gen6,
-        sizeof(pp_nv12_load_save_gen6),
-        NULL,
+        {
+            "NV12 Load & Save module",
+            PP_NV12_LOAD_SAVE,
+            pp_nv12_load_save_gen6,
+            sizeof(pp_nv12_load_save_gen6),
+            NULL,
+        },
+
         pp_nv12_load_save_initialize,
     },
 
     {
-        "NV12 Scaling module",
-        PP_NV12_SCALING,
-        pp_nv12_scaling_gen6,
-        sizeof(pp_nv12_scaling_gen6),
-        NULL,
+        {
+            "NV12 Scaling module",
+            PP_NV12_SCALING,
+            pp_nv12_scaling_gen6,
+            sizeof(pp_nv12_scaling_gen6),
+            NULL,
+        },
+
         pp_nv12_scaling_initialize,
     },
 
     {
-        "NV12 AVS module",
-        PP_NV12_AVS,
-        pp_nv12_avs_gen6,
-        sizeof(pp_nv12_avs_gen6),
-        NULL,
+        {
+            "NV12 AVS module",
+            PP_NV12_AVS,
+            pp_nv12_avs_gen6,
+            sizeof(pp_nv12_avs_gen6),
+            NULL,
+        },
+
         pp_nv12_avs_initialize,
     },
 
     {
-        "NV12 DNDI module",
-        PP_NV12_DNDI,
-        pp_nv12_dndi_gen6,
-        sizeof(pp_nv12_dndi_gen6),
-        NULL,
+        {
+            "NV12 DNDI module",
+            PP_NV12_DNDI,
+            pp_nv12_dndi_gen6,
+            sizeof(pp_nv12_dndi_gen6),
+            NULL,
+        },
+
         pp_nv12_dndi_initialize,
     },
 };
 
-#define NUM_PP_MODULES ARRAY_ELEMS(pp_modules_gen5)
-
-static struct pp_module *pp_modules = NULL;
-
-struct pp_static_parameter
-{
-    struct {
-        /* Procamp r1.0 */
-        float procamp_constant_c0;
-        
-        /* Load and Same r1.1 */
-        unsigned int source_packed_y_offset:8;
-        unsigned int source_packed_u_offset:8;
-        unsigned int source_packed_v_offset:8;
-        unsigned int pad0:8;
-
-        union {
-            /* Load and Save r1.2 */
-            struct {
-                unsigned int destination_packed_y_offset:8;
-                unsigned int destination_packed_u_offset:8;
-                unsigned int destination_packed_v_offset:8;
-                unsigned int pad0:8;
-            } load_and_save;
-
-            /* CSC r1.2 */
-            struct {
-                unsigned int destination_rgb_format:8;
-                unsigned int pad0:24;
-            } csc;
-        } r1_2;
-        
-        /* Procamp r1.3 */
-        float procamp_constant_c1;
-
-        /* Procamp r1.4 */
-        float procamp_constant_c2;
-
-        /* DI r1.5 */
-        unsigned int statistics_surface_picth:16;  /* Devided by 2 */
-        unsigned int pad1:16;
-
-        union {
-            /* DI r1.6 */
-            struct {
-                unsigned int pad0:24;
-                unsigned int top_field_first:8;
-            } di;
-
-            /* AVS/Scaling r1.6 */
-            float normalized_video_y_scaling_step;
-        } r1_6;
-
-        /* Procamp r1.7 */
-        float procamp_constant_c5;
-    } grf1;
-    
-    struct {
-        /* Procamp r2.0 */
-        float procamp_constant_c3;
-
-        /* MBZ r2.1*/
-        unsigned int pad0;
-
-        /* WG+CSC r2.2 */
-        float wg_csc_constant_c4;
-
-        /* WG+CSC r2.3 */
-        float wg_csc_constant_c8;
-
-        /* Procamp r2.4 */
-        float procamp_constant_c4;
-
-        /* MBZ r2.5 */
-        unsigned int pad1;
-
-        /* MBZ r2.6 */
-        unsigned int pad2;
-
-        /* WG+CSC r2.7 */
-        float wg_csc_constant_c9;
-    } grf2;
-
-    struct {
-        /* WG+CSC r3.0 */
-        float wg_csc_constant_c0;
-
-        /* Blending r3.1 */
-        float scaling_step_ratio;
-
-        /* Blending r3.2 */
-        float normalized_alpha_y_scaling;
-        
-        /* WG+CSC r3.3 */
-        float wg_csc_constant_c4;
-
-        /* WG+CSC r3.4 */
-        float wg_csc_constant_c1;
-
-        /* ALL r3.5 */
-        int horizontal_origin_offset:16;
-        int vertical_origin_offset:16;
-
-        /* Shared r3.6*/
-        union {
-            /* Color filll */
-            unsigned int color_pixel;
-
-            /* WG+CSC */
-            float wg_csc_constant_c2;
-        } r3_6;
-
-        /* WG+CSC r3.7 */
-        float wg_csc_constant_c3;
-    } grf3;
-
-    struct {
-        /* WG+CSC r4.0 */
-        float wg_csc_constant_c6;
-
-        /* ALL r4.1 MBZ ???*/
-        unsigned int pad0;
-
-        /* Shared r4.2 */
-        union {
-            /* AVS */
-            struct {
-                unsigned int pad1:15;
-                unsigned int nlas:1;
-                unsigned int pad2:16;
-            } avs;
-
-            /* DI */
-            struct {
-                unsigned int motion_history_coefficient_m2:8;
-                unsigned int motion_history_coefficient_m1:8;
-                unsigned int pad0:16;
-            } di;
-        } r4_2;
-
-        /* WG+CSC r4.3 */
-        float wg_csc_constant_c7;
-
-        /* WG+CSC r4.4 */
-        float wg_csc_constant_c10;
-
-        /* AVS r4.5 */
-        float source_video_frame_normalized_horizontal_origin;
-
-        /* MBZ r4.6 */
-        unsigned int pad1;
-
-        /* WG+CSC r4.7 */
-        float wg_csc_constant_c11;
-    } grf4;
-};
-
-struct pp_inline_parameter
-{
-    struct {
-        /* ALL r5.0 */
-        int destination_block_horizontal_origin:16;
-        int destination_block_vertical_origin:16;
-
-        /* Shared r5.1 */
-        union {
-            /* AVS/Scaling */
-            float source_surface_block_normalized_horizontal_origin;
-
-            /* FMD */
-            struct {
-                unsigned int variance_surface_vertical_origin:16;
-                unsigned int pad0:16;
-            } fmd;
-        } r5_1; 
-
-        /* AVS/Scaling r5.2 */
-        float source_surface_block_normalized_vertical_origin;
-
-        /* Alpha r5.3 */
-        float alpha_surface_block_normalized_horizontal_origin;
-
-        /* Alpha r5.4 */
-        float alpha_surface_block_normalized_vertical_origin;
-
-        /* Alpha r5.5 */
-        unsigned int alpha_mask_x:16;
-        unsigned int alpha_mask_y:8;
-        unsigned int block_count_x:8;
-
-        /* r5.6 */
-        unsigned int block_horizontal_mask:16;
-        unsigned int block_vertical_mask:8;
-        unsigned int number_blocks:8;
-
-        /* AVS/Scaling r5.7 */
-        float normalized_video_x_scaling_step;
-    } grf5;
-
-    struct {
-        /* AVS r6.0 */
-        float video_step_delta;
-
-        /* r6.1-r6.7 */
-        unsigned int padx[7];
-    } grf6;
-};
-
-static struct pp_static_parameter pp_static_parameter;
-static struct pp_inline_parameter pp_inline_parameter;
+#define pp_static_parameter     pp_context->pp_static_parameter
+#define pp_inline_parameter     pp_context->pp_inline_parameter
 
 static void
 pp_set_surface_tiling(struct i965_surface_state *ss, unsigned int tiling)
@@ -477,7 +285,7 @@ ironlake_pp_interface_descriptor_table(struct i965_post_processing_context *pp_c
     desc = bo->virtual;
     memset(desc, 0, sizeof(*desc));
     desc->desc0.grf_reg_blocks = 10;
-    desc->desc0.kernel_start_pointer = pp_modules[pp_index].bo->offset >> 6; /* reloc */
+    desc->desc0.kernel_start_pointer = pp_context->pp_modules[pp_index].kernel.bo->offset >> 6; /* reloc */
     desc->desc1.const_urb_entry_read_offset = 0;
     desc->desc1.const_urb_entry_read_len = 4; /* grf 1-4 */
     desc->desc2.sampler_state_pointer = pp_context->sampler_state_table.bo->offset >> 5;
@@ -490,7 +298,7 @@ ironlake_pp_interface_descriptor_table(struct i965_post_processing_context *pp_c
                       I915_GEM_DOMAIN_INSTRUCTION, 0,
                       desc->desc0.grf_reg_blocks,
                       offsetof(struct i965_interface_descriptor, desc0),
-                      pp_modules[pp_index].bo);
+                      pp_context->pp_modules[pp_index].kernel.bo);
 
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_INSTRUCTION, 0,
@@ -592,78 +400,97 @@ ironlake_pp_states_setup(VADriverContextP ctx)
 static void
 ironlake_pp_pipeline_select(VADriverContextP ctx)
 {
-    BEGIN_BATCH(ctx, 1);
-    OUT_BATCH(ctx, CMD_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
-    ADVANCE_BATCH(ctx);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 1);
+    OUT_BATCH(batch, CMD_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 ironlake_pp_urb_layout(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
     unsigned int vfe_fence, cs_fence;
 
     vfe_fence = pp_context->urb.cs_start;
     cs_fence = pp_context->urb.size;
 
-    BEGIN_BATCH(ctx, 3);
-    OUT_BATCH(ctx, CMD_URB_FENCE | UF0_VFE_REALLOC | UF0_CS_REALLOC | 1);
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx, 
+    BEGIN_BATCH(batch, 3);
+    OUT_BATCH(batch, CMD_URB_FENCE | UF0_VFE_REALLOC | UF0_CS_REALLOC | 1);
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch, 
               (vfe_fence << UF2_VFE_FENCE_SHIFT) |      /* VFE_SIZE */
               (cs_fence << UF2_CS_FENCE_SHIFT));        /* CS_SIZE */
-    ADVANCE_BATCH(ctx);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 ironlake_pp_state_base_address(VADriverContextP ctx)
 {
-    BEGIN_BATCH(ctx, 8);
-    OUT_BATCH(ctx, CMD_STATE_BASE_ADDRESS | 6);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    ADVANCE_BATCH(ctx);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 8);
+    OUT_BATCH(batch, CMD_STATE_BASE_ADDRESS | 6);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 ironlake_pp_state_pointers(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
-    BEGIN_BATCH(ctx, 3);
-    OUT_BATCH(ctx, CMD_MEDIA_STATE_POINTERS | 1);
-    OUT_BATCH(ctx, 0);
-    OUT_RELOC(ctx, pp_context->vfe_state.bo, I915_GEM_DOMAIN_INSTRUCTION, 0, 0);
-    ADVANCE_BATCH(ctx);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 3);
+    OUT_BATCH(batch, CMD_MEDIA_STATE_POINTERS | 1);
+    OUT_BATCH(batch, 0);
+    OUT_RELOC(batch, pp_context->vfe_state.bo, I915_GEM_DOMAIN_INSTRUCTION, 0, 0);
+    ADVANCE_BATCH(batch);
 }
 
 static void 
 ironlake_pp_cs_urb_layout(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
-    BEGIN_BATCH(ctx, 2);
-    OUT_BATCH(ctx, CMD_CS_URB_STATE | 0);
-    OUT_BATCH(ctx,
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 2);
+    OUT_BATCH(batch, CMD_CS_URB_STATE | 0);
+    OUT_BATCH(batch,
               ((pp_context->urb.size_cs_entry - 1) << 4) |     /* URB Entry Allocation Size */
               (pp_context->urb.num_cs_entries << 0));          /* Number of URB Entries */
-    ADVANCE_BATCH(ctx);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 ironlake_pp_constant_buffer(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
-    BEGIN_BATCH(ctx, 2);
-    OUT_BATCH(ctx, CMD_CONSTANT_BUFFER | (1 << 8) | (2 - 2));
-    OUT_RELOC(ctx, pp_context->curbe.bo,
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 2);
+    OUT_BATCH(batch, CMD_CONSTANT_BUFFER | (1 << 8) | (2 - 2));
+    OUT_RELOC(batch, pp_context->curbe.bo,
               I915_GEM_DOMAIN_INSTRUCTION, 0,
               pp_context->urb.size_cs_entry - 1);
-    ADVANCE_BATCH(ctx);    
+    ADVANCE_BATCH(batch);    
 }
 
 static void
 ironlake_pp_object_walker(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
     int x, x_steps, y, y_steps;
 
     x_steps = pp_context->pp_x_steps(&pp_context->private_context);
@@ -671,18 +498,18 @@ ironlake_pp_object_walker(VADriverContextP ctx, struct i965_post_processing_cont
 
     for (y = 0; y < y_steps; y++) {
         for (x = 0; x < x_steps; x++) {
-            if (!pp_context->pp_set_block_parameter(&pp_context->private_context, x, y)) {
-                BEGIN_BATCH(ctx, 20);
-                OUT_BATCH(ctx, CMD_MEDIA_OBJECT | 18);
-                OUT_BATCH(ctx, 0);
-                OUT_BATCH(ctx, 0); /* no indirect data */
-                OUT_BATCH(ctx, 0);
+            if (!pp_context->pp_set_block_parameter(pp_context, x, y)) {
+                BEGIN_BATCH(batch, 20);
+                OUT_BATCH(batch, CMD_MEDIA_OBJECT | 18);
+                OUT_BATCH(batch, 0);
+                OUT_BATCH(batch, 0); /* no indirect data */
+                OUT_BATCH(batch, 0);
 
                 /* inline data grf 5-6 */
                 assert(sizeof(pp_inline_parameter) == 64);
-                intel_batchbuffer_data(ctx, &pp_inline_parameter, sizeof(pp_inline_parameter));
+                intel_batchbuffer_data(batch, &pp_inline_parameter, sizeof(pp_inline_parameter));
 
-                ADVANCE_BATCH(ctx);
+                ADVANCE_BATCH(batch);
             }
         }
     }
@@ -692,10 +519,11 @@ static void
 ironlake_pp_pipeline_setup(VADriverContextP ctx)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
     struct i965_post_processing_context *pp_context = i965->pp_context;
 
-    intel_batchbuffer_start_atomic(ctx, 0x1000);
-    intel_batchbuffer_emit_mi_flush(ctx);
+    intel_batchbuffer_start_atomic(batch, 0x1000);
+    intel_batchbuffer_emit_mi_flush(batch);
     ironlake_pp_pipeline_select(ctx);
     ironlake_pp_state_base_address(ctx);
     ironlake_pp_state_pointers(ctx, pp_context);
@@ -703,7 +531,7 @@ ironlake_pp_pipeline_setup(VADriverContextP ctx)
     ironlake_pp_cs_urb_layout(ctx, pp_context);
     ironlake_pp_constant_buffer(ctx, pp_context);
     ironlake_pp_object_walker(ctx, pp_context);
-    intel_batchbuffer_end_atomic(ctx);
+    intel_batchbuffer_end_atomic(batch);
 }
 
 static int
@@ -719,30 +547,18 @@ pp_null_y_steps(void *private_context)
 }
 
 static int
-pp_null_set_block_parameter(void *private_context, int x, int y)
+pp_null_set_block_parameter(struct i965_post_processing_context *pp_context, int x, int y)
 {
     return 0;
 }
 
 static void
-pp_null_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                   unsigned short srcw, unsigned short srch,
-                   unsigned short destw, unsigned short desth)
+pp_null_initialize(VADriverContextP ctx, 
+                   VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                   const VARectangle *src_rect, const VARectangle *dst_rect)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
-    struct object_surface *obj_surface;
-
-    /* surface */
-    obj_surface = SURFACE(surface);
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = obj_surface->bo;
-    dri_bo_reference(obj_surface->pp_out_bo);
-    assert(obj_surface->pp_out_bo);
-    obj_surface->pp_out_width = obj_surface->width;
-    obj_surface->pp_out_height = obj_surface->height;
-    obj_surface->orig_pp_out_width = obj_surface->orig_width;
-    obj_surface->orig_pp_out_height = obj_surface->orig_height;
 
     /* private function & data */
     pp_context->pp_x_steps = pp_null_x_steps;
@@ -765,7 +581,7 @@ pp_load_save_y_steps(void *private_context)
 }
 
 static int
-pp_load_save_set_block_parameter(void *private_context, int x, int y)
+pp_load_save_set_block_parameter(struct i965_post_processing_context *pp_context, int x, int y)
 {
     pp_inline_parameter.grf5.block_vertical_mask = 0xff;
     pp_inline_parameter.grf5.block_horizontal_mask = 0xffff;
@@ -776,9 +592,9 @@ pp_load_save_set_block_parameter(void *private_context, int x, int y)
 }
 
 static void
-pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                             unsigned short srcw, unsigned short srch,
-                             unsigned short destw, unsigned short desth)
+pp_nv12_load_save_initialize(VADriverContextP ctx,
+                             VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                             const VARectangle *src_rect, const VARectangle *dst_rect)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -790,27 +606,15 @@ pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     int orig_w, orig_h;
     unsigned int tiling, swizzle;
 
-    /* surface */
-    obj_surface = SURFACE(surface);
+    /* source surface */
+    obj_surface = SURFACE(in_surface_id);
     orig_w = obj_surface->orig_width;
     orig_h = obj_surface->orig_height;
     w = obj_surface->width;
     h = obj_surface->height;
-
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = dri_bo_alloc(i965->intel.bufmgr,
-                                          "intermediate surface",
-                                          SIZE_YUV420(w, h),
-                                          4096);
-    assert(obj_surface->pp_out_bo);
-    obj_surface->pp_out_width = obj_surface->width;
-    obj_surface->pp_out_height = obj_surface->height;
-    obj_surface->orig_pp_out_width = obj_surface->orig_width;
-    obj_surface->orig_pp_out_height = obj_surface->orig_height;
-
-    /* source Y surface index 1 */
     dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
+    /* source Y surface index 1 */
     index = 1;
     pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
@@ -868,9 +672,17 @@ pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
 
+    /* destination surface */
+    obj_surface = SURFACE(out_surface_id);
+    orig_w = obj_surface->orig_width;
+    orig_h = obj_surface->orig_height;
+    w = obj_surface->width;
+    h = obj_surface->height;
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
+
     /* destination Y surface index 7 */
     index = 7;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -888,6 +700,7 @@ pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     ss->ss2.width = orig_w / 4 - 1;
     ss->ss2.height = orig_h - 1;
     ss->ss3.pitch = w - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -898,7 +711,7 @@ pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
 
     /* destination UV surface index 8 */
     index = 8;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -916,6 +729,7 @@ pp_nv12_load_save_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     ss->ss2.width = orig_w / 4 - 1;
     ss->ss2.height = orig_h / 2 - 1;
     ss->ss3.pitch = w - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -950,23 +764,24 @@ pp_scaling_y_steps(void *private_context)
 }
 
 static int
-pp_scaling_set_block_parameter(void *private_context, int x, int y)
+pp_scaling_set_block_parameter(struct i965_post_processing_context *pp_context, int x, int y)
 {
+    struct pp_scaling_context *pp_scaling_context = (struct pp_scaling_context *)&pp_context->private_context;
     float src_x_steping = pp_inline_parameter.grf5.normalized_video_x_scaling_step;
     float src_y_steping = pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step;
 
-    pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = src_x_steping * x * 16;
-    pp_inline_parameter.grf5.source_surface_block_normalized_vertical_origin = src_y_steping * y * 8;
-    pp_inline_parameter.grf5.destination_block_horizontal_origin = x * 16;
-    pp_inline_parameter.grf5.destination_block_vertical_origin = y * 8;
+    pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = src_x_steping * x * 16 + pp_scaling_context->src_normalized_x;
+    pp_inline_parameter.grf5.source_surface_block_normalized_vertical_origin = src_y_steping * y * 8 + pp_scaling_context->src_normalized_y;
+    pp_inline_parameter.grf5.destination_block_horizontal_origin = x * 16 + pp_scaling_context->dest_x;
+    pp_inline_parameter.grf5.destination_block_vertical_origin = y * 8 + pp_scaling_context->dest_y;
     
     return 0;
 }
 
 static void
-pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                           unsigned short srcw, unsigned short srch,
-                           unsigned short destw, unsigned short desth)
+pp_nv12_scaling_initialize(VADriverContextP ctx,
+                           VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                           const VARectangle *src_rect, const VARectangle *dst_rect)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -976,37 +791,19 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     struct i965_surface_state *ss;
     dri_bo *bo;
     int index;
-    int w, h;
-    int orig_w, orig_h;
-    int pp_out_w, pp_out_h;
-    int orig_pp_out_w, orig_pp_out_h;
+    int in_w, in_h, in_wpitch, in_hpitch;
+    int out_w, out_h, out_wpitch, out_hpitch;
     unsigned int tiling, swizzle;
 
-    /* surface */
-    obj_surface = SURFACE(surface);
-    orig_w = obj_surface->orig_width;
-    orig_h = obj_surface->orig_height;
-    w = obj_surface->width;
-    h = obj_surface->height;
-
-    orig_pp_out_w = destw;
-    orig_pp_out_h = desth;
-    pp_out_w = ALIGN(orig_pp_out_w, 16);
-    pp_out_h = ALIGN(orig_pp_out_h, 16);
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = dri_bo_alloc(i965->intel.bufmgr,
-                                          "intermediate surface",
-                                          SIZE_YUV420(pp_out_w, pp_out_h),
-                                          4096);
-    assert(obj_surface->pp_out_bo);
-    obj_surface->orig_pp_out_width = orig_pp_out_w;
-    obj_surface->orig_pp_out_height = orig_pp_out_h;
-    obj_surface->pp_out_width = pp_out_w;
-    obj_surface->pp_out_height = pp_out_h;
-
-    /* source Y surface index 1 */
+    /* source surface */
+    obj_surface = SURFACE(in_surface_id);
+    in_w = obj_surface->orig_width;
+    in_h = obj_surface->orig_height;
+    in_wpitch = obj_surface->width;
+    in_hpitch = obj_surface->height;
     dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
+    /* source Y surface index 1 */
     index = 1;
     pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
@@ -1023,9 +820,9 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8_UNORM;
     ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset;
-    ss->ss2.width = orig_w - 1;
-    ss->ss2.height = orig_h - 1;
-    ss->ss3.pitch = w - 1;
+    ss->ss2.width = in_w - 1;
+    ss->ss2.height = in_h - 1;
+    ss->ss3.pitch = in_wpitch - 1;
     pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
@@ -1051,22 +848,30 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     memset(ss, 0, sizeof(*ss));
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8G8_UNORM;
-    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + w * h;
-    ss->ss2.width = orig_w / 2 - 1;
-    ss->ss2.height = orig_h / 2 - 1;
-    ss->ss3.pitch = w - 1;
+    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + in_wpitch * in_hpitch;
+    ss->ss2.width = in_w / 2 - 1;
+    ss->ss2.height = in_h / 2 - 1;
+    ss->ss3.pitch = in_wpitch - 1;
     pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       0,
-                      w * h,
+                      in_wpitch * in_hpitch,
                       offsetof(struct i965_surface_state, ss1),
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
 
+    /* destination surface */
+    obj_surface = SURFACE(out_surface_id);
+    out_w = obj_surface->orig_width;
+    out_h = obj_surface->orig_height;
+    out_wpitch = obj_surface->width;
+    out_hpitch = obj_surface->height;
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
+
     /* destination Y surface index 7 */
     index = 7;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1081,9 +886,10 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8_UNORM;
     ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset;
-    ss->ss2.width = pp_out_w / 4 - 1;
-    ss->ss2.height = pp_out_h - 1;
-    ss->ss3.pitch = pp_out_w - 1;
+    ss->ss2.width = out_w / 4 - 1;
+    ss->ss2.height = out_h - 1;
+    ss->ss3.pitch = out_wpitch - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -1094,7 +900,7 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
 
     /* destination UV surface index 8 */
     index = 8;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1108,14 +914,15 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     memset(ss, 0, sizeof(*ss));
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8G8_UNORM;
-    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + pp_out_w * pp_out_h;
-    ss->ss2.width = pp_out_w / 4 - 1;
-    ss->ss2.height = pp_out_h / 2 - 1;
-    ss->ss3.pitch = pp_out_w - 1;
+    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + out_wpitch * out_hpitch;
+    ss->ss2.width = out_w / 4 - 1;
+    ss->ss2.height = out_h / 2 - 1;
+    ss->ss3.pitch = out_wpitch - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
-                      pp_out_w * pp_out_h,
+                      out_wpitch * out_hpitch,
                       offsetof(struct i965_surface_state, ss1),
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
@@ -1146,13 +953,18 @@ pp_nv12_scaling_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     pp_context->pp_y_steps = pp_scaling_y_steps;
     pp_context->pp_set_block_parameter = pp_scaling_set_block_parameter;
 
-    pp_scaling_context->dest_w = pp_out_w;
-    pp_scaling_context->dest_h = pp_out_h;
+    pp_scaling_context->dest_x = dst_rect->x;
+    pp_scaling_context->dest_y = dst_rect->y;
+    pp_scaling_context->dest_w = ALIGN(dst_rect->width, 16);
+    pp_scaling_context->dest_h = ALIGN(dst_rect->height, 16);
+    pp_scaling_context->src_normalized_x = (float)src_rect->x / in_w / out_w;
+    pp_scaling_context->src_normalized_y = (float)src_rect->y / in_h / out_h;
 
-    pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step = (float) 1.0 / pp_out_h;
-    pp_inline_parameter.grf5.normalized_video_x_scaling_step = (float) 1.0 / pp_out_w;
-    pp_inline_parameter.grf5.block_count_x = pp_out_w / 16;   /* 1 x N */
-    pp_inline_parameter.grf5.number_blocks = pp_out_w / 16;
+    pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step = (float) src_rect->height / in_h / out_h;
+
+    pp_inline_parameter.grf5.normalized_video_x_scaling_step = (float) src_rect->width / in_w / out_w;
+    pp_inline_parameter.grf5.block_count_x = pp_scaling_context->dest_w / 16;   /* 1 x N */
+    pp_inline_parameter.grf5.number_blocks = pp_scaling_context->dest_w / 16;
     pp_inline_parameter.grf5.block_vertical_mask = 0xff;
     pp_inline_parameter.grf5.block_horizontal_mask = 0xffff;
 }
@@ -1172,9 +984,9 @@ pp_avs_y_steps(void *private_context)
 }
 
 static int
-pp_avs_set_block_parameter(void *private_context, int x, int y)
+pp_avs_set_block_parameter(struct i965_post_processing_context *pp_context, int x, int y)
 {
-    struct pp_avs_context *pp_avs_context = private_context;
+    struct pp_avs_context *pp_avs_context = (struct pp_avs_context *)&pp_context->private_context;
     float src_x_steping, src_y_steping, video_step_delta;
     int tmp_w = ALIGN(pp_avs_context->dest_h * pp_avs_context->src_w / pp_avs_context->src_h, 16);
 
@@ -1183,7 +995,8 @@ pp_avs_set_block_parameter(void *private_context, int x, int y)
         pp_inline_parameter.grf6.video_step_delta = 0;
         
         if (x == 0) {
-            pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = (float)(tmp_w - pp_avs_context->dest_w) / tmp_w / 2;
+            pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = (float)(tmp_w - pp_avs_context->dest_w) / tmp_w / 2 +
+                pp_avs_context->src_normalized_x;
         } else {
             src_x_steping = pp_inline_parameter.grf5.normalized_video_x_scaling_step;
             video_step_delta = pp_inline_parameter.grf6.video_step_delta;
@@ -1207,7 +1020,7 @@ pp_avs_set_block_parameter(void *private_context, int x, int y)
 
             if (x == 0) {
                 pp_inline_parameter.grf5.normalized_video_x_scaling_step = 1.0 / pp_avs_context->dest_w;
-                pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = 0.0;
+                pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = pp_avs_context->src_normalized_x;
             } else {
                 src_x_steping = pp_inline_parameter.grf5.normalized_video_x_scaling_step;
                 video_step_delta = pp_inline_parameter.grf6.video_step_delta;
@@ -1223,7 +1036,7 @@ pp_avs_set_block_parameter(void *private_context, int x, int y)
                 pp_inline_parameter.grf6.video_step_delta = b;
 
                 if (x == 0) {
-                    pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = 0.0;
+                    pp_inline_parameter.grf5.r5_1.source_surface_block_normalized_horizontal_origin = pp_avs_context->src_normalized_x;
                     pp_inline_parameter.grf5.normalized_video_x_scaling_step = a;
                 } else {
                     src_x_steping = pp_inline_parameter.grf5.normalized_video_x_scaling_step;
@@ -1259,17 +1072,17 @@ pp_avs_set_block_parameter(void *private_context, int x, int y)
     }
 
     src_y_steping = pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step;
-    pp_inline_parameter.grf5.source_surface_block_normalized_vertical_origin = src_y_steping * y * 8;
-    pp_inline_parameter.grf5.destination_block_horizontal_origin = x * 16;
-    pp_inline_parameter.grf5.destination_block_vertical_origin = y * 8;
+    pp_inline_parameter.grf5.source_surface_block_normalized_vertical_origin = src_y_steping * y * 8 + pp_avs_context->src_normalized_y;
+    pp_inline_parameter.grf5.destination_block_horizontal_origin = x * 16 + pp_avs_context->dest_x;
+    pp_inline_parameter.grf5.destination_block_vertical_origin = y * 8 + pp_avs_context->dest_y;
 
     return 0;
 }
 
 static void
-pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                       unsigned short srcw, unsigned short srch,
-                       unsigned short destw, unsigned short desth)
+pp_nv12_avs_initialize(VADriverContextP ctx,
+                       VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                       const VARectangle *src_rect, const VARectangle *dst_rect)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -1279,37 +1092,23 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     struct i965_sampler_8x8 *sampler_8x8;
     struct i965_sampler_8x8_state *sampler_8x8_state;
     struct i965_surface_state2 *ss_8x8;
-    dri_bo *bo, *src_bo;
+    dri_bo *bo;
     int index;
-    int w, h;
-    int orig_w, orig_h;
-    int pp_out_w, pp_out_h;
-    int orig_pp_out_w, orig_pp_out_h;
+    int in_w, in_h, in_wpitch, in_hpitch;
+    int out_w, out_h, out_wpitch, out_hpitch;
     unsigned int tiling, swizzle;
 
     /* surface */
-    obj_surface = SURFACE(surface);
-    
-    if (input == 1) {
-        orig_w = obj_surface->orig_pp_out_width;
-        orig_h = obj_surface->orig_pp_out_height;
-        w = obj_surface->pp_out_width;
-        h = obj_surface->pp_out_height;
-        src_bo = obj_surface->pp_out_bo;
-    } else {
-        orig_w = obj_surface->orig_width;
-        orig_h = obj_surface->orig_height;
-        w = obj_surface->width;
-        h = obj_surface->height;
-        src_bo = obj_surface->bo;
-    }
-
-    assert(src_bo);
-    dri_bo_get_tiling(src_bo, &tiling, &swizzle);
+    obj_surface = SURFACE(in_surface_id);
+    in_w = obj_surface->orig_width;
+    in_h = obj_surface->orig_height;
+    in_wpitch = obj_surface->width;
+    in_hpitch = obj_surface->height;
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
     /* source Y surface index 1 */
     index = 1;
-    pp_context->surfaces[index].s_bo = src_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "Y surface state for sample_8x8", 
@@ -1323,10 +1122,10 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     memset(ss_8x8, 0, sizeof(*ss_8x8));
     ss_8x8->ss0.surface_base_address = pp_context->surfaces[index].s_bo->offset;
     ss_8x8->ss1.cbcr_pixel_offset_v_direction = 0;
-    ss_8x8->ss1.width = orig_w - 1;
-    ss_8x8->ss1.height = orig_h - 1;
+    ss_8x8->ss1.width = in_w - 1;
+    ss_8x8->ss1.height = in_h - 1;
     ss_8x8->ss2.half_pitch_for_chroma = 0;
-    ss_8x8->ss2.pitch = w - 1;
+    ss_8x8->ss2.pitch = in_wpitch - 1;
     ss_8x8->ss2.interleave_chroma = 0;
     ss_8x8->ss2.surface_format = SURFACE_FORMAT_Y8_UNORM;
     ss_8x8->ss3.x_offset_for_cb = 0;
@@ -1342,7 +1141,7 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
 
     /* source UV surface index 2 */
     index = 2;
-    pp_context->surfaces[index].s_bo = src_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "UV surface state for sample_8x8", 
@@ -1354,12 +1153,12 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     assert(bo->virtual);
     ss_8x8 = bo->virtual;
     memset(ss_8x8, 0, sizeof(*ss_8x8));
-    ss_8x8->ss0.surface_base_address = pp_context->surfaces[index].s_bo->offset + w * h;
+    ss_8x8->ss0.surface_base_address = pp_context->surfaces[index].s_bo->offset + in_wpitch * in_hpitch;
     ss_8x8->ss1.cbcr_pixel_offset_v_direction = 0;
-    ss_8x8->ss1.width = orig_w - 1;
-    ss_8x8->ss1.height = orig_h - 1;
+    ss_8x8->ss1.width = in_w - 1;
+    ss_8x8->ss1.height = in_h - 1;
     ss_8x8->ss2.half_pitch_for_chroma = 0;
-    ss_8x8->ss2.pitch = w - 1;
+    ss_8x8->ss2.pitch = in_wpitch - 1;
     ss_8x8->ss2.interleave_chroma = 1;
     ss_8x8->ss2.surface_format = SURFACE_FORMAT_PLANAR_420_8;
     ss_8x8->ss3.x_offset_for_cb = 0;
@@ -1368,29 +1167,23 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       0,
-                      w * h,
+                      in_wpitch * in_hpitch,
                       offsetof(struct i965_surface_state2, ss0),
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
 
-    orig_pp_out_w = destw;
-    orig_pp_out_h = desth;
-    pp_out_w = ALIGN(orig_pp_out_w, 16);
-    pp_out_h = ALIGN(orig_pp_out_h, 16);
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = dri_bo_alloc(i965->intel.bufmgr,
-                                          "intermediate surface",
-                                          SIZE_YUV420(pp_out_w, pp_out_h),
-                                          4096);
-    assert(obj_surface->pp_out_bo);
-    obj_surface->orig_pp_out_width = orig_pp_out_w;
-    obj_surface->orig_pp_out_height = orig_pp_out_h;
-    obj_surface->pp_out_width = pp_out_w;
-    obj_surface->pp_out_height = pp_out_h;
+    /* destination surface */
+    obj_surface = SURFACE(out_surface_id);
+    out_w = obj_surface->orig_width;
+    out_h = obj_surface->orig_height;
+    out_wpitch = obj_surface->width;
+    out_hpitch = obj_surface->height;
+    assert(out_w <= out_wpitch && out_h <= out_hpitch);
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
     /* destination Y surface index 7 */
     index = 7;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1405,9 +1198,10 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8_UNORM;
     ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset;
-    ss->ss2.width = pp_out_w / 4 - 1;
-    ss->ss2.height = pp_out_h - 1;
-    ss->ss3.pitch = pp_out_w - 1;
+    ss->ss2.width = out_w / 4 - 1;
+    ss->ss2.height = out_h - 1;
+    ss->ss3.pitch = out_wpitch - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -1418,7 +1212,7 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
 
     /* destination UV surface index 8 */
     index = 8;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1432,14 +1226,15 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     memset(ss, 0, sizeof(*ss));
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8G8_UNORM;
-    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + pp_out_w * pp_out_h;
-    ss->ss2.width = pp_out_w / 4 - 1;
-    ss->ss2.height = pp_out_h / 2 - 1;
-    ss->ss3.pitch = pp_out_w - 1;
+    ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + out_wpitch * out_hpitch;
+    ss->ss2.width = out_w / 4 - 1;
+    ss->ss2.height = out_h / 2 - 1;
+    ss->ss3.pitch = out_wpitch - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
-                      pp_out_w * pp_out_h,
+                      out_wpitch * out_hpitch,
                       offsetof(struct i965_surface_state, ss1),
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
@@ -1608,16 +1403,21 @@ pp_nv12_avs_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
     pp_context->pp_y_steps = pp_avs_y_steps;
     pp_context->pp_set_block_parameter = pp_avs_set_block_parameter;
 
-    pp_avs_context->dest_w = pp_out_w;
-    pp_avs_context->dest_h = pp_out_h;
-    pp_avs_context->src_w = w;
-    pp_avs_context->src_h = h;
+    pp_avs_context->dest_x = dst_rect->x;
+    pp_avs_context->dest_y = dst_rect->y;
+    pp_avs_context->dest_w = ALIGN(dst_rect->width, 16);
+    pp_avs_context->dest_h = ALIGN(dst_rect->height, 16);
+    pp_avs_context->src_normalized_x = (float)src_rect->x / in_w / out_w;
+    pp_avs_context->src_normalized_y = (float)src_rect->y / in_h / out_h;
+    pp_avs_context->src_w = src_rect->width;
+    pp_avs_context->src_h = src_rect->height;
 
     pp_static_parameter.grf4.r4_2.avs.nlas = 1;
-    pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step = (float) 1.0 / pp_out_h;
-    pp_inline_parameter.grf5.normalized_video_x_scaling_step = (float) 1.0 / pp_out_w;
+    pp_static_parameter.grf1.r1_6.normalized_video_y_scaling_step = (float) src_rect->height / in_h / out_h;
+
+    pp_inline_parameter.grf5.normalized_video_x_scaling_step = (float) src_rect->width / in_w / out_w;
     pp_inline_parameter.grf5.block_count_x = 1;        /* M x 1 */
-    pp_inline_parameter.grf5.number_blocks = pp_out_h / 8;
+    pp_inline_parameter.grf5.number_blocks = pp_avs_context->dest_h / 8;
     pp_inline_parameter.grf5.block_vertical_mask = 0xff;
     pp_inline_parameter.grf5.block_horizontal_mask = 0xffff;
     pp_inline_parameter.grf6.video_step_delta = 0.0;
@@ -1638,7 +1438,7 @@ pp_dndi_y_steps(void *private_context)
 }
 
 static int
-pp_dndi_set_block_parameter(void *private_context, int x, int y)
+pp_dndi_set_block_parameter(struct i965_post_processing_context *pp_context, int x, int y)
 {
     pp_inline_parameter.grf5.destination_block_horizontal_origin = x * 16;
     pp_inline_parameter.grf5.destination_block_vertical_origin = y * 4;
@@ -1647,9 +1447,9 @@ pp_dndi_set_block_parameter(void *private_context, int x, int y)
 }
 
 static 
-void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int input,
-                             unsigned short srcw, unsigned short srch,
-                             unsigned short destw, unsigned short desth)
+void pp_nv12_dndi_initialize(VADriverContextP ctx,
+                             VASurfaceID in_surface_id, VASurfaceID out_surface_id,
+                             const VARectangle *src_rect, const VARectangle *dst_rect)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -1665,11 +1465,12 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     unsigned int tiling, swizzle;
 
     /* surface */
-    obj_surface = SURFACE(surface);
+    obj_surface = SURFACE(in_surface_id);
     orig_w = obj_surface->orig_width;
     orig_h = obj_surface->orig_height;
     w = obj_surface->width;
     h = obj_surface->height;
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
     if (pp_context->stmm.bo == NULL) {
         pp_context->stmm.bo = dri_bo_alloc(i965->intel.bufmgr,
@@ -1679,18 +1480,6 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
         assert(pp_context->stmm.bo);
     }
 
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = dri_bo_alloc(i965->intel.bufmgr,
-                                          "intermediate surface",
-                                          SIZE_YUV420(w, h),
-                                          4096);
-    assert(obj_surface->pp_out_bo);
-    obj_surface->orig_pp_out_width = orig_w;
-    obj_surface->orig_pp_out_height = orig_h;
-    obj_surface->pp_out_width = w;
-    obj_surface->pp_out_height = h;
-
-    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
     /* source UV surface index 2 */
     index = 2;
     pp_context->surfaces[index].s_bo = obj_surface->bo;
@@ -1784,9 +1573,17 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
                       pp_context->surfaces[index].s_bo);
     dri_bo_unmap(bo);
 
+    /* destination surface */
+    obj_surface = SURFACE(out_surface_id);
+    orig_w = obj_surface->orig_width;
+    orig_h = obj_surface->orig_height;
+    w = obj_surface->width;
+    h = obj_surface->height;
+    dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
+
     /* destination Y surface index 7 */
     index = 7;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1801,9 +1598,10 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8_UNORM;
     ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset;
-    ss->ss2.width = w / 4 - 1;
-    ss->ss2.height = h - 1;
+    ss->ss2.width = orig_w / 4 - 1;
+    ss->ss2.height = orig_h - 1;
     ss->ss3.pitch = w - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -1814,7 +1612,7 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
 
     /* destination UV surface index 8 */
     index = 8;
-    pp_context->surfaces[index].s_bo = obj_surface->pp_out_bo;
+    pp_context->surfaces[index].s_bo = obj_surface->bo;
     dri_bo_reference(pp_context->surfaces[index].s_bo);
     bo = dri_bo_alloc(i965->intel.bufmgr, 
                       "surface state", 
@@ -1829,9 +1627,10 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
     ss->ss0.surface_type = I965_SURFACE_2D;
     ss->ss0.surface_format = I965_SURFACEFORMAT_R8G8_UNORM;
     ss->ss1.base_addr = pp_context->surfaces[index].s_bo->offset + w * h;
-    ss->ss2.width = w / 4 - 1;
-    ss->ss2.height = h / 2 - 1;
+    ss->ss2.width = orig_w / 4 - 1;
+    ss->ss2.height = orig_h / 2 - 1;
     ss->ss3.pitch = w - 1;
+    pp_set_surface_tiling(ss, tiling);
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_RENDER, 
                       I915_GEM_DOMAIN_RENDER,
@@ -1920,18 +1719,14 @@ void pp_nv12_dndi_initialize(VADriverContextP ctx, VASurfaceID surface, int inpu
 }
 
 static void
-ironlake_pp_initialize(VADriverContextP ctx,
-                       VASurfaceID surface,
-                       int input,
-                       short srcx,
-                       short srcy,
-                       unsigned short srcw,
-                       unsigned short srch,
-                       short destx,
-                       short desty,
-                       unsigned short destw,
-                       unsigned short desth,
-                       int pp_index)
+ironlake_pp_initialize(
+    VADriverContextP   ctx,
+    VASurfaceID        in_surface_id,
+    VASurfaceID        out_surface_id,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    int                pp_index
+)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -2010,49 +1805,38 @@ ironlake_pp_initialize(VADriverContextP ctx,
     memset(&pp_static_parameter, 0, sizeof(pp_static_parameter));
     memset(&pp_inline_parameter, 0, sizeof(pp_inline_parameter));
     assert(pp_index >= PP_NULL && pp_index < NUM_PP_MODULES);
-    assert(pp_modules);
     pp_context->current_pp = pp_index;
-    pp_module = &pp_modules[pp_index];
+    pp_module = &pp_context->pp_modules[pp_index];
     
     if (pp_module->initialize)
-        pp_module->initialize(ctx, surface, input, srcw, srch, destw, desth);
+        pp_module->initialize(ctx, in_surface_id, out_surface_id,
+                              src_rect, dst_rect);
 }
 
 static void
-ironlake_post_processing(VADriverContextP ctx,
-                         VASurfaceID surface,
-                         int input,
-                         short srcx,
-                         short srcy,
-                         unsigned short srcw,
-                         unsigned short srch,
-                         short destx,
-                         short desty,
-                         unsigned short destw,
-                         unsigned short desth,
-                         int pp_index)
+ironlake_post_processing(
+    VADriverContextP   ctx,
+    VASurfaceID        in_surface_id,
+    VASurfaceID        out_surface_id,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    int                pp_index
+)
 {
-    ironlake_pp_initialize(ctx, surface, input,
-                           srcx, srcy, srcw, srch,
-                           destx, desty, destw, desth,
-                           pp_index);
+    ironlake_pp_initialize(ctx, in_surface_id, out_surface_id, src_rect, dst_rect, pp_index);
     ironlake_pp_states_setup(ctx);
     ironlake_pp_pipeline_setup(ctx);
 }
 
 static void
-gen6_pp_initialize(VADriverContextP ctx,
-                   VASurfaceID surface,
-                   int input,
-                   short srcx,
-                   short srcy,
-                   unsigned short srcw,
-                   unsigned short srch,
-                   short destx,
-                   short desty,
-                   unsigned short destw,
-                   unsigned short desth,
-                   int pp_index)
+gen6_pp_initialize(
+    VADriverContextP   ctx,
+    VASurfaceID        in_surface_id,
+    VASurfaceID        out_surface_id,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    int                pp_index
+)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct i965_post_processing_context *pp_context = i965->pp_context;
@@ -2131,12 +1915,12 @@ gen6_pp_initialize(VADriverContextP ctx,
     memset(&pp_static_parameter, 0, sizeof(pp_static_parameter));
     memset(&pp_inline_parameter, 0, sizeof(pp_inline_parameter));
     assert(pp_index >= PP_NULL && pp_index < NUM_PP_MODULES);
-    assert(pp_modules);
     pp_context->current_pp = pp_index;
-    pp_module = &pp_modules[pp_index];
+    pp_module = &pp_context->pp_modules[pp_index];
     
     if (pp_module->initialize)
-        pp_module->initialize(ctx, surface, input, srcw, srch, destw, desth);
+        pp_module->initialize(ctx, in_surface_id, out_surface_id,
+                              src_rect, dst_rect);
 }
 
 static void
@@ -2181,7 +1965,7 @@ gen6_pp_interface_descriptor_table(struct i965_post_processing_context *pp_conte
     desc = bo->virtual;
     memset(desc, 0, sizeof(*desc));
     desc->desc0.kernel_start_pointer = 
-        pp_modules[pp_index].bo->offset >> 6; /* reloc */
+        pp_context->pp_modules[pp_index].kernel.bo->offset >> 6; /* reloc */
     desc->desc1.single_program_flow = 1;
     desc->desc1.floating_point_mode = FLOATING_POINT_IEEE_754;
     desc->desc2.sampler_count = 1;      /* 1 - 4 samplers used */
@@ -2197,7 +1981,7 @@ gen6_pp_interface_descriptor_table(struct i965_post_processing_context *pp_conte
                       I915_GEM_DOMAIN_INSTRUCTION, 0,
                       0,
                       offsetof(struct gen6_interface_descriptor_data, desc0),
-                      pp_modules[pp_index].bo);
+                      pp_context->pp_modules[pp_index].kernel.bo);
 
     dri_bo_emit_reloc(bo,
                       I915_GEM_DOMAIN_INSTRUCTION, 0,
@@ -2242,82 +2026,99 @@ gen6_pp_states_setup(VADriverContextP ctx)
 static void
 gen6_pp_pipeline_select(VADriverContextP ctx)
 {
-    BEGIN_BATCH(ctx, 1);
-    OUT_BATCH(ctx, CMD_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
-    ADVANCE_BATCH(ctx);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 1);
+    OUT_BATCH(batch, CMD_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 gen6_pp_state_base_address(VADriverContextP ctx)
 {
-    BEGIN_BATCH(ctx, 10);
-    OUT_BATCH(ctx, CMD_STATE_BASE_ADDRESS | (10 - 2));
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    OUT_BATCH(ctx, 0 | BASE_ADDRESS_MODIFY);
-    ADVANCE_BATCH(ctx);
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 10);
+    OUT_BATCH(batch, CMD_STATE_BASE_ADDRESS | (10 - 2));
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    OUT_BATCH(batch, 0 | BASE_ADDRESS_MODIFY);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 gen6_pp_vfe_state(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
-    BEGIN_BATCH(ctx, 8);
-    OUT_BATCH(ctx, CMD_MEDIA_VFE_STATE | (8 - 2));
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx,
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 8);
+    OUT_BATCH(batch, CMD_MEDIA_VFE_STATE | (8 - 2));
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch,
               (pp_context->urb.num_vfe_entries - 1) << 16 |
               pp_context->urb.num_vfe_entries << 8);
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx,
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch,
               (pp_context->urb.size_vfe_entry * 2) << 16 |  /* in 256 bits unit */
               (pp_context->urb.size_cs_entry * pp_context->urb.num_cs_entries * 2 - 1));            /* in 256 bits unit */
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx, 0);
-    ADVANCE_BATCH(ctx);
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch, 0);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 gen6_pp_curbe_load(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
     assert(pp_context->urb.size_cs_entry * pp_context->urb.num_cs_entries * 512 <= pp_context->curbe.bo->size);
 
-    BEGIN_BATCH(ctx, 4);
-    OUT_BATCH(ctx, CMD_MEDIA_CURBE_LOAD | (4 - 2));
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx,
+    BEGIN_BATCH(batch, 4);
+    OUT_BATCH(batch, CMD_MEDIA_CURBE_LOAD | (4 - 2));
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch,
               pp_context->urb.size_cs_entry * pp_context->urb.num_cs_entries * 512);
-    OUT_RELOC(ctx, 
+    OUT_RELOC(batch, 
               pp_context->curbe.bo,
               I915_GEM_DOMAIN_INSTRUCTION, 0,
               0);
-    ADVANCE_BATCH(ctx);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 gen6_interface_descriptor_load(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
-    BEGIN_BATCH(ctx, 4);
-    OUT_BATCH(ctx, CMD_MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2));
-    OUT_BATCH(ctx, 0);
-    OUT_BATCH(ctx,
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
+
+    BEGIN_BATCH(batch, 4);
+    OUT_BATCH(batch, CMD_MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2));
+    OUT_BATCH(batch, 0);
+    OUT_BATCH(batch,
               pp_context->idrt.num_interface_descriptors * sizeof(struct gen6_interface_descriptor_data));
-    OUT_RELOC(ctx, 
+    OUT_RELOC(batch, 
               pp_context->idrt.bo,
               I915_GEM_DOMAIN_INSTRUCTION, 0,
               0);
-    ADVANCE_BATCH(ctx);
+    ADVANCE_BATCH(batch);
 }
 
 static void
 gen6_pp_object_walker(VADriverContextP ctx, struct i965_post_processing_context *pp_context)
 {
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
     int x, x_steps, y, y_steps;
 
     x_steps = pp_context->pp_x_steps(&pp_context->private_context);
@@ -2325,20 +2126,20 @@ gen6_pp_object_walker(VADriverContextP ctx, struct i965_post_processing_context 
 
     for (y = 0; y < y_steps; y++) {
         for (x = 0; x < x_steps; x++) {
-            if (!pp_context->pp_set_block_parameter(&pp_context->private_context, x, y)) {
-                BEGIN_BATCH(ctx, 22);
-                OUT_BATCH(ctx, CMD_MEDIA_OBJECT | 20);
-                OUT_BATCH(ctx, 0);
-                OUT_BATCH(ctx, 0); /* no indirect data */
-                OUT_BATCH(ctx, 0);
-                OUT_BATCH(ctx, 0); /* scoreboard */
-                OUT_BATCH(ctx, 0);
+            if (!pp_context->pp_set_block_parameter(pp_context, x, y)) {
+                BEGIN_BATCH(batch, 22);
+                OUT_BATCH(batch, CMD_MEDIA_OBJECT | 20);
+                OUT_BATCH(batch, 0);
+                OUT_BATCH(batch, 0); /* no indirect data */
+                OUT_BATCH(batch, 0);
+                OUT_BATCH(batch, 0); /* scoreboard */
+                OUT_BATCH(batch, 0);
 
                 /* inline data grf 5-6 */
                 assert(sizeof(pp_inline_parameter) == 64);
-                intel_batchbuffer_data(ctx, &pp_inline_parameter, sizeof(pp_inline_parameter));
+                intel_batchbuffer_data(batch, &pp_inline_parameter, sizeof(pp_inline_parameter));
 
-                ADVANCE_BATCH(ctx);
+                ADVANCE_BATCH(batch);
             }
         }
     }
@@ -2348,105 +2149,132 @@ static void
 gen6_pp_pipeline_setup(VADriverContextP ctx)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct intel_batchbuffer *batch = i965->batch;
     struct i965_post_processing_context *pp_context = i965->pp_context;
 
-    intel_batchbuffer_start_atomic(ctx, 0x1000);
-    intel_batchbuffer_emit_mi_flush(ctx);
+    intel_batchbuffer_start_atomic(batch, 0x1000);
+    intel_batchbuffer_emit_mi_flush(batch);
     gen6_pp_pipeline_select(ctx);
     gen6_pp_curbe_load(ctx, pp_context);
     gen6_interface_descriptor_load(ctx, pp_context);
     gen6_pp_state_base_address(ctx);
     gen6_pp_vfe_state(ctx, pp_context);
     gen6_pp_object_walker(ctx, pp_context);
-    intel_batchbuffer_end_atomic(ctx);
+    intel_batchbuffer_end_atomic(batch);
 }
 
 static void
-gen6_post_processing(VADriverContextP ctx,
-                     VASurfaceID surface,
-                     int input,
-                     short srcx,
-                     short srcy,
-                     unsigned short srcw,
-                     unsigned short srch,
-                     short destx,
-                     short desty,
-                     unsigned short destw,
-                     unsigned short desth,
-                     int pp_index)
+gen6_post_processing(
+    VADriverContextP   ctx,
+    VASurfaceID        in_surface_id,
+    VASurfaceID        out_surface_id,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    int                pp_index
+)
 {
-    gen6_pp_initialize(ctx, surface, input,
-                       srcx, srcy, srcw, srch,
-                       destx, desty, destw, desth,
-                       pp_index);
+    gen6_pp_initialize(ctx, in_surface_id, out_surface_id, src_rect, dst_rect, pp_index);
     gen6_pp_states_setup(ctx);
     gen6_pp_pipeline_setup(ctx);
 }
 
 static void
-i965_post_processing_internal(VADriverContextP ctx,
-                              VASurfaceID surface,
-                              int input,
-                              short srcx,
-                              short srcy,
-                              unsigned short srcw,
-                              unsigned short srch,
-                              short destx,
-                              short desty,
-                              unsigned short destw,
-                              unsigned short desth,
-                              int pp_index)
+i965_post_processing_internal(
+    VADriverContextP   ctx,
+    VASurfaceID        in_surface_id,
+    VASurfaceID        out_surface_id,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    int                pp_index
+)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
 
-    if (IS_GEN6(i965->intel.device_id))
-        gen6_post_processing(ctx, surface, input,
-                             srcx, srcy, srcw, srch,
-                             destx, desty, destw, desth,
-                             pp_index);
+    if (IS_GEN6(i965->intel.device_id) ||
+        IS_GEN7(i965->intel.device_id))
+        gen6_post_processing(ctx, in_surface_id, out_surface_id, src_rect, dst_rect, pp_index);
     else
-        ironlake_post_processing(ctx, surface, input,
-                                 srcx, srcy, srcw, srch,
-                                 destx, desty, destw, desth,
-                                 pp_index);
+        ironlake_post_processing(ctx, in_surface_id, out_surface_id, src_rect, dst_rect, pp_index);
 }
 
-void
-i965_post_processing(VADriverContextP ctx,
-                     VASurfaceID surface,
-                     short srcx,
-                     short srcy,
-                     unsigned short srcw,
-                     unsigned short srch,
-                     short destx,
-                     short desty,
-                     unsigned short destw,
-                     unsigned short desth,
-                     unsigned int flag)
+VAStatus 
+i965_DestroySurfaces(VADriverContextP ctx,
+                     VASurfaceID *surface_list,
+                     int num_surfaces);
+VAStatus 
+i965_CreateSurfaces(VADriverContextP ctx,
+                    int width,
+                    int height,
+                    int format,
+                    int num_surfaces,
+                    VASurfaceID *surfaces);
+VASurfaceID
+i965_post_processing(
+    VADriverContextP   ctx,
+    VASurfaceID        surface,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    unsigned int       flags,
+    int               *has_done_scaling  
+)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
+    VASurfaceID in_surface_id = surface;
+    VASurfaceID out_surface_id = VA_INVALID_ID;
 
     if (HAS_PP(i965)) {
         /* Currently only support post processing for NV12 surface */
         if (i965->render_state.interleaved_uv) {
-            int internal_input = 0;
+            struct object_surface *obj_surface;
+            VAStatus status;
 
-            if (flag & I965_PP_FLAG_DEINTERLACING) {
-                i965_post_processing_internal(ctx, surface, internal_input,
-                                              srcx, srcy, srcw, srch,
-                                              destx, desty, destw, desth,
+            if (flags & I965_PP_FLAG_DEINTERLACING) {
+                obj_surface = SURFACE(in_surface_id);
+                status = i965_CreateSurfaces(ctx,
+                                             obj_surface->orig_width,
+                                             obj_surface->orig_height,
+                                             VA_RT_FORMAT_YUV420,
+                                             1,
+                                             &out_surface_id);
+                assert(status == VA_STATUS_SUCCESS);
+                obj_surface = SURFACE(out_surface_id);
+                i965_check_alloc_surface_bo(ctx, obj_surface, 0, VA_FOURCC('N','V','1','2'));
+                i965_post_processing_internal(ctx,
+                                              in_surface_id, out_surface_id,
+                                              src_rect, dst_rect,
                                               PP_NV12_DNDI);
-                internal_input = 1;
             }
 
-            if (flag & I965_PP_FLAG_AVS) {
-                i965_post_processing_internal(ctx, surface, internal_input,
-                                              srcx, srcy, srcw, srch,
-                                              destx, desty, destw, desth,
+            if (flags & I965_PP_FLAG_AVS) {
+                struct i965_render_state *render_state = &i965->render_state;
+                struct intel_region *dest_region = render_state->draw_region;
+
+                if (out_surface_id != VA_INVALID_ID)
+                    in_surface_id = out_surface_id;
+
+                status = i965_CreateSurfaces(ctx,
+                                             dest_region->width,
+                                             dest_region->height,
+                                             VA_RT_FORMAT_YUV420,
+                                             1,
+                                             &out_surface_id);
+                assert(status == VA_STATUS_SUCCESS);
+                obj_surface = SURFACE(out_surface_id);
+                i965_check_alloc_surface_bo(ctx, obj_surface, 0, VA_FOURCC('N','V','1','2'));
+                i965_post_processing_internal(ctx,
+                                              in_surface_id, out_surface_id,
+                                              src_rect, dst_rect,
                                               PP_NV12_AVS);
+
+                if (in_surface_id != surface)
+                    i965_DestroySurfaces(ctx, &in_surface_id, 1);
+                
+                *has_done_scaling = 1;
             }
         }
     }
+
+    return out_surface_id;
 }       
 
 Bool
@@ -2491,17 +2319,17 @@ i965_post_processing_terminate(VADriverContextP ctx)
             dri_bo_unreference(pp_context->stmm.bo);
             pp_context->stmm.bo = NULL;
 
+            for (i = 0; i < NUM_PP_MODULES; i++) {
+                struct pp_module *pp_module = &pp_context->pp_modules[i];
+
+                dri_bo_unreference(pp_module->kernel.bo);
+                pp_module->kernel.bo = NULL;
+            }
+
             free(pp_context);
         }
 
         i965->pp_context = NULL;
-
-        for (i = 0; i < NUM_PP_MODULES && pp_modules; i++) {
-            struct pp_module *pp_module = &pp_modules[i];
-
-            dri_bo_unreference(pp_module->bo);
-            pp_module->bo = NULL;
-        }
     }
 
     return True;
@@ -2518,36 +2346,37 @@ i965_post_processing_init(VADriverContextP ctx)
         if (pp_context == NULL) {
             pp_context = calloc(1, sizeof(*pp_context));
             i965->pp_context = pp_context;
-        }
 
-        pp_context->urb.size = URB_SIZE((&i965->intel));
-        pp_context->urb.num_vfe_entries = 32;
-        pp_context->urb.size_vfe_entry = 1;     /* in 512 bits unit */
-        pp_context->urb.num_cs_entries = 1;
-        pp_context->urb.size_cs_entry = 2;      /* in 512 bits unit */
-        pp_context->urb.vfe_start = 0;
-        pp_context->urb.cs_start = pp_context->urb.vfe_start + 
-            pp_context->urb.num_vfe_entries * pp_context->urb.size_vfe_entry;
-        assert(pp_context->urb.cs_start + 
-               pp_context->urb.num_cs_entries * pp_context->urb.size_cs_entry <= URB_SIZE((&i965->intel)));
+            pp_context->urb.size = URB_SIZE((&i965->intel));
+            pp_context->urb.num_vfe_entries = 32;
+            pp_context->urb.size_vfe_entry = 1;     /* in 512 bits unit */
+            pp_context->urb.num_cs_entries = 1;
+            pp_context->urb.size_cs_entry = 2;      /* in 512 bits unit */
+            pp_context->urb.vfe_start = 0;
+            pp_context->urb.cs_start = pp_context->urb.vfe_start + 
+                pp_context->urb.num_vfe_entries * pp_context->urb.size_vfe_entry;
+            assert(pp_context->urb.cs_start + 
+                   pp_context->urb.num_cs_entries * pp_context->urb.size_cs_entry <= URB_SIZE((&i965->intel)));
 
-        assert(NUM_PP_MODULES == ARRAY_ELEMS(pp_modules_gen6));
+            assert(NUM_PP_MODULES == ARRAY_ELEMS(pp_modules_gen5));
+            assert(NUM_PP_MODULES == ARRAY_ELEMS(pp_modules_gen6));
 
-        if (IS_GEN6(i965->intel.device_id))
-            pp_modules = pp_modules_gen6;
-        else if (IS_IRONLAKE(i965->intel.device_id)) {
-            pp_modules = pp_modules_gen5;
-        }
+            if (IS_GEN6(i965->intel.device_id) ||
+                IS_GEN7(i965->intel.device_id))
+                memcpy(pp_context->pp_modules, pp_modules_gen6, sizeof(pp_context->pp_modules));
+            else if (IS_IRONLAKE(i965->intel.device_id))
+                memcpy(pp_context->pp_modules, pp_modules_gen5, sizeof(pp_context->pp_modules));
 
-        for (i = 0; i < NUM_PP_MODULES && pp_modules; i++) {
-            struct pp_module *pp_module = &pp_modules[i];
-            dri_bo_unreference(pp_module->bo);
-            pp_module->bo = dri_bo_alloc(i965->intel.bufmgr,
-                                         pp_module->name,
-                                         pp_module->size,
-                                         4096);
-            assert(pp_module->bo);
-            dri_bo_subdata(pp_module->bo, 0, pp_module->size, pp_module->bin);
+            for (i = 0; i < NUM_PP_MODULES; i++) {
+                struct pp_module *pp_module = &pp_context->pp_modules[i];
+                dri_bo_unreference(pp_module->kernel.bo);
+                pp_module->kernel.bo = dri_bo_alloc(i965->intel.bufmgr,
+                                                    pp_module->kernel.name,
+                                                    pp_module->kernel.size,
+                                                    4096);
+                assert(pp_module->kernel.bo);
+                dri_bo_subdata(pp_module->kernel.bo, 0, pp_module->kernel.size, pp_module->kernel.bin);
+            }
         }
     }
 

@@ -6,7 +6,8 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-  putsurface-android.cpp
+  putsurface_android.cpp
+  #putsurface_x11.c
 
 LOCAL_CFLAGS += \
     -DANDROID  

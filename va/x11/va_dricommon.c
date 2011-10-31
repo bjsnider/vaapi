@@ -50,11 +50,25 @@ do_drawable_hash(VADriverContextP ctx, XID drawable)
 
     dri_drawable = dri_state->createDrawable(ctx, drawable);
     dri_drawable->x_drawable = drawable;
-    dri_drawable->is_window = is_window((Display *)ctx->native_dpy, drawable);
+    dri_drawable->is_window = is_window(ctx->native_dpy, drawable);
     dri_drawable->next = dri_state->drawable_hash[index];
     dri_state->drawable_hash[index] = dri_drawable;
 
     return dri_drawable;
+}
+
+void
+free_drawable(VADriverContextP ctx, struct dri_drawable* dri_drawable)
+{
+    struct dri_state *dri_state = (struct dri_state *)ctx->dri_state;
+    int i = 0;
+
+    while (i++ < DRAWABLE_HASH_SZ) {
+	if (dri_drawable == dri_state->drawable_hash[i]) {
+	    dri_state->destroyDrawable(ctx, dri_drawable);
+	    dri_state->drawable_hash[i] = NULL;
+	}
+    }
 }
 
 void
@@ -72,6 +86,8 @@ free_drawable_hashtable(VADriverContextP ctx)
             dri_drawable = prev->next;
             dri_state->destroyDrawable(ctx, prev);
         }
+
+	dri_state->drawable_hash[i] = NULL;
     }
 }
 
