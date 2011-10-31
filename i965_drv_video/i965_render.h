@@ -31,7 +31,11 @@
 #define MAX_SAMPLERS            16
 #define MAX_RENDER_SURFACES     (MAX_SAMPLERS + 1)
 
+#define NUM_RENDER_KERNEL       3
+
 #include "i965_post_processing.h"
+
+struct i965_kernel;
 
 struct i965_render_state
 {
@@ -66,37 +70,33 @@ struct i965_render_state
         int upload;
     } curbe;
 
-    int interleaved_uv;
+    unsigned short interleaved_uv;
+    unsigned short inited;
     struct intel_region *draw_region;
 
     int pp_flag; /* 0: disable, 1: enable */
-    struct i965_post_processing_context pp_context;
+
+    struct i965_kernel render_kernels[3];
 };
 
 Bool i965_render_init(VADriverContextP ctx);
 Bool i965_render_terminate(VADriverContextP ctx);
-void intel_render_put_surface(VADriverContextP ctx,
-                             VASurfaceID surface,
-                             short srcx,
-                             short srcy,
-                             unsigned short srcw,
-                             unsigned short srch,
-                             short destx,
-                             short desty,
-                             unsigned short destw,
-                             unsigned short desth,
-                             unsigned int flag);
-
 
 void
-intel_render_put_subpicture(VADriverContextP ctx,
-                        VASurfaceID surface,
-                        short srcx,
-                        short srcy,
-                        unsigned short srcw,
-                        unsigned short srch,
-                        short destx,
-                        short desty,
-                        unsigned short destw,
-                        unsigned short desth);
+intel_render_put_surface(
+    VADriverContextP   ctx,
+    VASurfaceID        surface,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect,
+    unsigned int       flags
+);
+
+void
+intel_render_put_subpicture(
+    VADriverContextP   ctx,
+    VASurfaceID        surface,
+    const VARectangle *src_rect,
+    const VARectangle *dst_rect
+);
+
 #endif /* _I965_RENDER_H_ */

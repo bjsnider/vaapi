@@ -37,10 +37,8 @@
 #include "intel_driver.h"
 #include "intel_memman.h"
 #include "intel_batchbuffer.h"
-
-#include "i965_media.h"
-#include "i965_drv_video.h"
 #include "i965_defines.h"
+#include "i965_drv_video.h"
 
 #define CONFIG_ID_OFFSET                0x01000000
 #define CONTEXT_ID_OFFSET               0x02000000
@@ -49,18 +47,28 @@
 #define IMAGE_ID_OFFSET                 0x0a000000
 #define SUBPIC_ID_OFFSET                0x10000000
 
-#define HAS_MPEG2(ctx)  (IS_G4X((ctx)->intel.device_id) || \
-                         IS_IRONLAKE((ctx)->intel.device_id) ||         \
-                         (IS_GEN6((ctx)->intel.device_id) && (ctx)->intel.has_bsd))
+#define HAS_MPEG2(ctx)  (IS_G4X((ctx)->intel.device_id) ||      \
+                         IS_IRONLAKE((ctx)->intel.device_id) || \
+                         ((IS_GEN6((ctx)->intel.device_id) ||   \
+                           IS_GEN7((ctx)->intel.device_id)) &&  \
+                          (ctx)->intel.has_bsd))
 
-#define HAS_H264(ctx)   ((IS_GEN6((ctx)->intel.device_id) ||            \
+#define HAS_H264(ctx)   ((IS_GEN7((ctx)->intel.device_id) ||            \
+                          IS_GEN6((ctx)->intel.device_id) ||            \
                           IS_IRONLAKE((ctx)->intel.device_id)) &&       \
-                          (ctx)->intel.has_bsd)
+                         (ctx)->intel.has_bsd)
 
-#define HAS_VC1(ctx)    (IS_GEN6((ctx)->intel.device_id) && (ctx)->intel.has_bsd)
+#define HAS_VC1(ctx)    ((IS_GEN7((ctx)->intel.device_id) ||    \
+                          IS_GEN6((ctx)->intel.device_id)) &&   \
+                         (ctx)->intel.has_bsd)
 
-#define HAS_TILED_SURFACE(ctx) (IS_GEN6((ctx)->intel.device_id) && \
+#define HAS_TILED_SURFACE(ctx) ((IS_GEN7((ctx)->intel.device_id) ||     \
+                                 IS_GEN6((ctx)->intel.device_id)) &&    \
                                 (ctx)->render_state.interleaved_uv)
+
+#define HAS_ENCODER(ctx)        ((IS_GEN7((ctx)->intel.device_id) ||    \
+                                  IS_GEN6((ctx)->intel.device_id)) &&   \
+                                 (ctx)->intel.has_bsd)
 
 enum {
     I965_SURFACETYPE_RGBA = 1,
@@ -96,18 +104,18 @@ static const i965_subpic_format_map_t
 i965_subpic_formats_map[I965_MAX_SUBPIC_FORMATS + 1] = {
     { I965_SURFACETYPE_INDEXED, I965_SURFACEFORMAT_P4A4_UNORM,
       { VA_FOURCC('I','A','4','4'), VA_MSB_FIRST, 8, },
-      0 },
+      VA_SUBPICTURE_DESTINATION_IS_SCREEN_COORD },
     { I965_SURFACETYPE_INDEXED, I965_SURFACEFORMAT_A4P4_UNORM,
       { VA_FOURCC('A','I','4','4'), VA_MSB_FIRST, 8, },
-      0 },
+      VA_SUBPICTURE_DESTINATION_IS_SCREEN_COORD },
     { I965_SURFACETYPE_RGBA, I965_SURFACEFORMAT_B8G8R8A8_UNORM,
       { VA_FOURCC('B','G','R','A'), VA_LSB_FIRST, 32,
         32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000 },
-      0 },
+      VA_SUBPICTURE_DESTINATION_IS_SCREEN_COORD },
     { I965_SURFACETYPE_RGBA, I965_SURFACEFORMAT_R8G8B8A8_UNORM,
       { VA_FOURCC('R','G','B','A'), VA_LSB_FIRST, 32,
         32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000 },
-      0 },
+      VA_SUBPICTURE_DESTINATION_IS_SCREEN_COORD },
 };
 
 static const i965_subpic_format_map_t *
@@ -127,6 +135,31 @@ get_subpic_format(const VAImageFormat *va_format)
     }
     return NULL;
 }
+
+extern struct hw_context *g4x_dec_hw_context_init(VADriverContextP, VAProfile);
+static struct hw_codec_info g4x_hw_codec_info = {
+    .dec_hw_context_init = g4x_dec_hw_context_init,
+    .enc_hw_context_init = NULL,
+};
+
+extern struct hw_context *ironlake_dec_hw_context_init(VADriverContextP, VAProfile);
+static struct hw_codec_info ironlake_hw_codec_info = {
+    .dec_hw_context_init = ironlake_dec_hw_context_init,
+    .enc_hw_context_init = NULL,
+};
+
+extern struct hw_context *gen6_dec_hw_context_init(VADriverContextP, VAProfile);
+extern struct hw_context *gen6_enc_hw_context_init(VADriverContextP, VAProfile);
+static struct hw_codec_info gen6_hw_codec_info = {
+    .dec_hw_context_init = gen6_dec_hw_context_init,
+    .enc_hw_context_init = gen6_enc_hw_context_init,
+};
+
+extern struct hw_context *gen7_dec_hw_context_init(VADriverContextP, VAProfile);
+static struct hw_codec_info gen7_hw_codec_info = {
+    .dec_hw_context_init = gen7_dec_hw_context_init,
+    .enc_hw_context_init = gen6_enc_hw_context_init,
+};
 
 VAStatus 
 i965_QueryConfigProfiles(VADriverContextP ctx,
@@ -181,6 +214,10 @@ i965_QueryConfigEntrypoints(VADriverContextP ctx,
     case VAProfileH264High:
         if (HAS_H264(i965))
             entrypoint_list[n++] = VAEntrypointVLD;
+        
+        if (HAS_ENCODER(i965))
+            entrypoint_list[n++] = VAEntrypointEncSlice;
+
         break;
 
     case VAProfileVC1Simple:
@@ -215,6 +252,10 @@ i965_GetConfigAttributes(VADriverContextP ctx,
         switch (attrib_list[i].type) {
         case VAConfigAttribRTFormat:
             attrib_list[i].value = VA_RT_FORMAT_YUV420;
+            break;
+
+        case VAConfigAttribRateControl:
+            attrib_list[i].value = VA_RC_VBR;
             break;
 
         default:
@@ -264,7 +305,7 @@ i965_CreateConfig(VADriverContextP ctx,
                   VAEntrypoint entrypoint,
                   VAConfigAttrib *attrib_list,
                   int num_attribs,
-                  VAConfigID *config_id)		/* out */
+                  VAConfigID *config_id)        /* out */
 {
     struct i965_driver_data * const i965 = i965_driver_data(ctx);
     struct object_config *obj_config;
@@ -286,7 +327,8 @@ i965_CreateConfig(VADriverContextP ctx,
     case VAProfileH264Baseline:
     case VAProfileH264Main:
     case VAProfileH264High:
-        if (HAS_H264(i965) && VAEntrypointVLD == entrypoint) {
+        if ((HAS_H264(i965) && VAEntrypointVLD == entrypoint) ||
+            (HAS_ENCODER(i965) && VAEntrypointEncSlice == entrypoint)) {
             vaStatus = VA_STATUS_SUCCESS;
         } else {
             vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
@@ -349,7 +391,6 @@ i965_CreateConfig(VADriverContextP ctx,
 VAStatus 
 i965_DestroyConfig(VADriverContextP ctx, VAConfigID config_id)
 {
-    struct intel_driver_data * const intel = intel_driver_data(ctx);
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct object_config *obj_config = CONFIG(config_id);
     VAStatus vaStatus;
@@ -394,8 +435,6 @@ i965_destroy_surface(struct object_heap *heap, struct object_base *obj)
 
     dri_bo_unreference(obj_surface->bo);
     obj_surface->bo = NULL;
-    dri_bo_unreference(obj_surface->pp_out_bo);
-    obj_surface->pp_out_bo = NULL;
 
     if (obj_surface->free_private_data != NULL) {
         obj_surface->free_private_data(&obj_surface->private_data);
@@ -437,7 +476,8 @@ i965_CreateSurfaces(VADriverContextP ctx,
         obj_surface->orig_width = width;
         obj_surface->orig_height = height;
 
-        if (IS_GEN6(i965->intel.device_id)) {
+        if (IS_GEN6(i965->intel.device_id) ||
+            IS_GEN7(i965->intel.device_id)) {
             obj_surface->width = ALIGN(obj_surface->orig_width, 128);
             obj_surface->height = ALIGN(obj_surface->orig_height, 32);
         } else {
@@ -447,8 +487,9 @@ i965_CreateSurfaces(VADriverContextP ctx,
 
         obj_surface->size = SIZE_YUV420(obj_surface->width, obj_surface->height);
         obj_surface->flags = SURFACE_REFERENCED;
+        obj_surface->fourcc = 0;
         obj_surface->bo = NULL;
-        obj_surface->pp_out_bo = NULL;
+        obj_surface->locked_image_id = VA_INVALID_ID;
         obj_surface->private_data = NULL;
         obj_surface->free_private_data = NULL;
     }
@@ -546,7 +587,7 @@ i965_QuerySubpictureFormats(VADriverContextP ctx,
 static void 
 i965_destroy_subpic(struct object_heap *heap, struct object_base *obj)
 {
-//    struct object_subpic *obj_subpic = (struct object_subpic *)obj;
+    //    struct object_subpic *obj_subpic = (struct object_subpic *)obj;
 
     object_heap_free(heap, obj);
 }
@@ -558,8 +599,8 @@ i965_CreateSubpicture(VADriverContextP ctx,
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     VASubpictureID subpicID = NEW_SUBPIC_ID()
-	
-        struct object_subpic *obj_subpic = SUBPIC(subpicID);
+    struct object_subpic *obj_subpic = SUBPIC(subpicID);
+
     if (!obj_subpic)
         return VA_STATUS_ERROR_ALLOCATION_FAILED;
 
@@ -585,7 +626,6 @@ VAStatus
 i965_DestroySubpicture(VADriverContextP ctx,
                        VASubpictureID subpicture)
 {
-	
     struct i965_driver_data *i965 = i965_driver_data(ctx);
     struct object_subpic *obj_subpic = SUBPIC(subpicture);
     i965_destroy_subpic(&i965->subpic_heap, (struct object_base *)obj_subpic);
@@ -652,6 +692,7 @@ i965_AssociateSubpicture(VADriverContextP ctx,
     obj_subpic->dst_rect.y      = dest_y;
     obj_subpic->dst_rect.width  = dest_width;
     obj_subpic->dst_rect.height = dest_height;
+    obj_subpic->flags           = flags;
 
     for (i = 0; i < num_surfaces; i++) {
         struct object_surface *obj_surface = SURFACE(target_surfaces[i]);
@@ -682,7 +723,7 @@ i965_DeassociateSubpicture(VADriverContextP ctx,
     return VA_STATUS_SUCCESS;
 }
 
-static void
+void
 i965_reference_buffer_store(struct buffer_store **ptr, 
                             struct buffer_store *buffer_store)
 {
@@ -694,7 +735,7 @@ i965_reference_buffer_store(struct buffer_store **ptr,
     }
 }
 
-static void 
+void 
 i965_release_buffer_store(struct buffer_store **ptr)
 {
     struct buffer_store *buffer_store = *ptr;
@@ -723,26 +764,38 @@ i965_destroy_context(struct object_heap *heap, struct object_base *obj)
     struct object_context *obj_context = (struct object_context *)obj;
     int i;
 
-    assert(obj_context->decode_state.num_slice_params <= obj_context->decode_state.max_slice_params);
-    assert(obj_context->decode_state.num_slice_datas <= obj_context->decode_state.max_slice_datas);
+    if (obj_context->hw_context) {
+        obj_context->hw_context->destroy(obj_context->hw_context);
+        obj_context->hw_context = NULL;
+    }
 
-    i965_release_buffer_store(&obj_context->decode_state.pic_param);
-    i965_release_buffer_store(&obj_context->decode_state.iq_matrix);
-    i965_release_buffer_store(&obj_context->decode_state.bit_plane);
+    if (obj_context->codec_type == CODEC_ENC) {
+        assert(obj_context->codec_state.enc.num_slice_params <= obj_context->codec_state.enc.max_slice_params);
+        i965_release_buffer_store(&obj_context->codec_state.enc.pic_param);
+        i965_release_buffer_store(&obj_context->codec_state.enc.seq_param);
+    } else {
+        assert(obj_context->codec_state.dec.num_slice_params <= obj_context->codec_state.dec.max_slice_params);
+        assert(obj_context->codec_state.dec.num_slice_datas <= obj_context->codec_state.dec.max_slice_datas);
 
-    for (i = 0; i < obj_context->decode_state.num_slice_params; i++)
-        i965_release_buffer_store(&obj_context->decode_state.slice_params[i]);
+        i965_release_buffer_store(&obj_context->codec_state.dec.pic_param);
+        i965_release_buffer_store(&obj_context->codec_state.dec.iq_matrix);
+        i965_release_buffer_store(&obj_context->codec_state.dec.bit_plane);
 
-    for (i = 0; i < obj_context->decode_state.num_slice_datas; i++)
-        i965_release_buffer_store(&obj_context->decode_state.slice_datas[i]);
+        for (i = 0; i < obj_context->codec_state.dec.num_slice_params; i++)
+            i965_release_buffer_store(&obj_context->codec_state.dec.slice_params[i]);
 
-    free(obj_context->decode_state.slice_params);
-    free(obj_context->decode_state.slice_datas);
+        for (i = 0; i < obj_context->codec_state.dec.num_slice_datas; i++)
+            i965_release_buffer_store(&obj_context->codec_state.dec.slice_datas[i]);
+
+        free(obj_context->codec_state.dec.slice_params);
+        free(obj_context->codec_state.dec.slice_datas);
+    }
+
     free(obj_context->render_targets);
     object_heap_free(heap, obj);
 }
 
-VAStatus 
+VAStatus
 i965_CreateContext(VADriverContextP ctx,
                    VAConfigID config_id,
                    int picture_width,
@@ -775,6 +828,8 @@ i965_CreateContext(VADriverContextP ctx,
         return vaStatus;
     }
 
+    render_state->inited = 1;
+
     switch (obj_config->profile) {
     case VAProfileH264Baseline:
     case VAProfileH264Main:
@@ -784,26 +839,20 @@ i965_CreateContext(VADriverContextP ctx,
         render_state->interleaved_uv = 1;
         break;
     default:
-        render_state->interleaved_uv = !!IS_GEN6(i965->intel.device_id);
+        render_state->interleaved_uv = !!(IS_GEN6(i965->intel.device_id) || IS_GEN7(i965->intel.device_id));
         break;
     }
 
-    obj_context->context_id = contextID;
     *context = contextID;
-    memset(&obj_context->decode_state, 0, sizeof(obj_context->decode_state));
-    obj_context->decode_state.current_render_target = -1;
-    obj_context->decode_state.max_slice_params = NUM_SLICES;
-    obj_context->decode_state.max_slice_datas = NUM_SLICES;
-    obj_context->decode_state.slice_params = calloc(obj_context->decode_state.max_slice_params,
-                                                    sizeof(*obj_context->decode_state.slice_params));
-    obj_context->decode_state.slice_datas = calloc(obj_context->decode_state.max_slice_datas,
-                                                   sizeof(*obj_context->decode_state.slice_datas));
+    obj_context->flags = flag;
+    obj_context->context_id = contextID;
     obj_context->config_id = config_id;
     obj_context->picture_width = picture_width;
     obj_context->picture_height = picture_height;
     obj_context->num_render_targets = num_render_targets;
     obj_context->render_targets = 
         (VASurfaceID *)calloc(num_render_targets, sizeof(VASurfaceID));
+    obj_context->hw_context = NULL;
 
     for(i = 0; i < num_render_targets; i++) {
         if (NULL == SURFACE(render_targets[i])) {
@@ -814,7 +863,31 @@ i965_CreateContext(VADriverContextP ctx,
         obj_context->render_targets[i] = render_targets[i];
     }
 
-    obj_context->flags = flag;
+    if (VA_STATUS_SUCCESS == vaStatus) {
+        if (VAEntrypointEncSlice == obj_config->entrypoint ) { /*encode routin only*/
+            obj_context->codec_type = CODEC_ENC;
+            memset(&obj_context->codec_state.enc, 0, sizeof(obj_context->codec_state.enc));
+            obj_context->codec_state.enc.current_render_target = VA_INVALID_ID;
+            obj_context->codec_state.enc.max_slice_params = NUM_SLICES;
+            obj_context->codec_state.enc.slice_params = calloc(obj_context->codec_state.enc.max_slice_params,
+                                                               sizeof(*obj_context->codec_state.enc.slice_params));
+            assert(i965->codec_info->enc_hw_context_init);
+            obj_context->hw_context = i965->codec_info->enc_hw_context_init(ctx, obj_config->profile);
+        } else {
+            obj_context->codec_type = CODEC_DEC;
+            memset(&obj_context->codec_state.dec, 0, sizeof(obj_context->codec_state.dec));
+            obj_context->codec_state.dec.current_render_target = -1;
+            obj_context->codec_state.dec.max_slice_params = NUM_SLICES;
+            obj_context->codec_state.dec.max_slice_datas = NUM_SLICES;
+            obj_context->codec_state.dec.slice_params = calloc(obj_context->codec_state.dec.max_slice_params,
+                                                               sizeof(*obj_context->codec_state.dec.slice_params));
+            obj_context->codec_state.dec.slice_datas = calloc(obj_context->codec_state.dec.max_slice_datas,
+                                                              sizeof(*obj_context->codec_state.dec.slice_datas));
+
+            assert(i965->codec_info->dec_hw_context_init);
+            obj_context->hw_context = i965->codec_info->dec_hw_context_init(ctx, obj_config->profile);
+        }
+    }
 
     /* Error recovery */
     if (VA_STATUS_SUCCESS != vaStatus) {
@@ -873,6 +946,10 @@ i965_create_buffer_internal(VADriverContextP ctx,
     case VAResidualDataBufferType:
     case VADeblockingParameterBufferType:
     case VAImageBufferType:
+    case VAEncCodedBufferType:
+    case VAEncSequenceParameterBufferType:
+    case VAEncPictureParameterBufferType:
+    case VAEncSliceParameterBufferType:
         /* Ok */
         break;
 
@@ -885,6 +962,10 @@ i965_create_buffer_internal(VADriverContextP ctx,
 
     if (NULL == obj_buffer) {
         return VA_STATUS_ERROR_ALLOCATION_FAILED;
+    }
+
+    if (type == VAEncCodedBufferType) {
+        size += ALIGN(sizeof(VACodedBufferSegment), 64);
     }
 
     obj_buffer->max_num_elements = num_elements;
@@ -902,14 +983,26 @@ i965_create_buffer_internal(VADriverContextP ctx,
         
         if (data)
             dri_bo_subdata(buffer_store->bo, 0, size * num_elements, data);
-    } else if (type == VASliceDataBufferType || type == VAImageBufferType) {
+    } else if (type == VASliceDataBufferType || type == VAImageBufferType || type == VAEncCodedBufferType) {
         buffer_store->bo = dri_bo_alloc(i965->intel.bufmgr, 
                                         "Buffer", 
                                         size * num_elements, 64);
         assert(buffer_store->bo);
 
-        if (data)
+        if (type == VAEncCodedBufferType) {
+            VACodedBufferSegment *coded_buffer_segment;
+            dri_bo_map(buffer_store->bo, 1);
+            coded_buffer_segment = (VACodedBufferSegment *)buffer_store->bo->virtual;
+            coded_buffer_segment->size = size - ALIGN(sizeof(VACodedBufferSegment), 64);
+            coded_buffer_segment->bit_offset = 0;
+            coded_buffer_segment->status = 0;
+            coded_buffer_segment->buf = NULL;
+            coded_buffer_segment->next = NULL;
+            dri_bo_unmap(buffer_store->bo);
+        } else if (data) {
             dri_bo_subdata(buffer_store->bo, 0, size * num_elements, data);
+        }
+
     } else {
         buffer_store->buffer = malloc(size * num_elements);
         assert(buffer_store->buffer);
@@ -988,6 +1081,12 @@ i965_MapBuffer(VADriverContextP ctx,
 
         assert(obj_buffer->buffer_store->bo->virtual);
         *pbuf = obj_buffer->buffer_store->bo->virtual;
+
+        if (obj_buffer->type == VAEncCodedBufferType) {
+            VACodedBufferSegment *coded_buffer_segment = (VACodedBufferSegment *)(obj_buffer->buffer_store->bo->virtual);
+            coded_buffer_segment->buf = (unsigned char *)(obj_buffer->buffer_store->bo->virtual) + ALIGN(sizeof(VACodedBufferSegment), 64);
+        }
+
         vaStatus = VA_STATUS_SUCCESS;
     } else if (NULL != obj_buffer->buffer_store->buffer) {
         *pbuf = obj_buffer->buffer_store->buffer;
@@ -1044,7 +1143,6 @@ i965_BeginPicture(VADriverContextP ctx,
                   VAContextID context,
                   VASurfaceID render_target)
 {
-    struct intel_driver_data * const intel = intel_driver_data(ctx);
     struct i965_driver_data *i965 = i965_driver_data(ctx); 
     struct object_context *obj_context = CONTEXT(context);
     struct object_surface *obj_surface = SURFACE(render_target);
@@ -1083,7 +1181,10 @@ i965_BeginPicture(VADriverContextP ctx,
         break;
     }
 
-    obj_context->decode_state.current_render_target = render_target;
+    if (obj_context->codec_type == CODEC_ENC)
+        obj_context->codec_state.enc.current_render_target = render_target;     /*This is input new frame*/
+    else
+        obj_context->codec_state.dec.current_render_target = render_target;
 
     return vaStatus;
 }
@@ -1095,8 +1196,8 @@ i965_render_picture_parameter_buffer(VADriverContextP ctx,
 {
     assert(obj_buffer->buffer_store->bo == NULL);
     assert(obj_buffer->buffer_store->buffer);
-    i965_release_buffer_store(&obj_context->decode_state.pic_param);
-    i965_reference_buffer_store(&obj_context->decode_state.pic_param,
+    i965_release_buffer_store(&obj_context->codec_state.dec.pic_param);
+    i965_reference_buffer_store(&obj_context->codec_state.dec.pic_param,
                                 obj_buffer->buffer_store);
 
     return VA_STATUS_SUCCESS;
@@ -1109,8 +1210,8 @@ i965_render_iq_matrix_buffer(VADriverContextP ctx,
 {
     assert(obj_buffer->buffer_store->bo == NULL);
     assert(obj_buffer->buffer_store->buffer);
-    i965_release_buffer_store(&obj_context->decode_state.iq_matrix);
-    i965_reference_buffer_store(&obj_context->decode_state.iq_matrix,
+    i965_release_buffer_store(&obj_context->codec_state.dec.iq_matrix);
+    i965_reference_buffer_store(&obj_context->codec_state.dec.iq_matrix,
                                 obj_buffer->buffer_store);
 
     return VA_STATUS_SUCCESS;
@@ -1123,8 +1224,8 @@ i965_render_bit_plane_buffer(VADriverContextP ctx,
 {
     assert(obj_buffer->buffer_store->bo == NULL);
     assert(obj_buffer->buffer_store->buffer);
-    i965_release_buffer_store(&obj_context->decode_state.bit_plane);
-    i965_reference_buffer_store(&obj_context->decode_state.bit_plane,
+    i965_release_buffer_store(&obj_context->codec_state.dec.bit_plane);
+    i965_reference_buffer_store(&obj_context->codec_state.dec.bit_plane,
                                 obj_buffer->buffer_store);
     
     return VA_STATUS_SUCCESS;
@@ -1138,17 +1239,17 @@ i965_render_slice_parameter_buffer(VADriverContextP ctx,
     assert(obj_buffer->buffer_store->bo == NULL);
     assert(obj_buffer->buffer_store->buffer);
     
-    if (obj_context->decode_state.num_slice_params == obj_context->decode_state.max_slice_params) {
-        obj_context->decode_state.slice_params = realloc(obj_context->decode_state.slice_params,
-                                                         (obj_context->decode_state.max_slice_params + NUM_SLICES) * sizeof(*obj_context->decode_state.slice_params));
-        memset(obj_context->decode_state.slice_params + obj_context->decode_state.max_slice_params, 0, NUM_SLICES * sizeof(*obj_context->decode_state.slice_params));
-        obj_context->decode_state.max_slice_params += NUM_SLICES;
+    if (obj_context->codec_state.dec.num_slice_params == obj_context->codec_state.dec.max_slice_params) {
+        obj_context->codec_state.dec.slice_params = realloc(obj_context->codec_state.dec.slice_params,
+                                                         (obj_context->codec_state.dec.max_slice_params + NUM_SLICES) * sizeof(*obj_context->codec_state.dec.slice_params));
+        memset(obj_context->codec_state.dec.slice_params + obj_context->codec_state.dec.max_slice_params, 0, NUM_SLICES * sizeof(*obj_context->codec_state.dec.slice_params));
+        obj_context->codec_state.dec.max_slice_params += NUM_SLICES;
     }
         
-    i965_release_buffer_store(&obj_context->decode_state.slice_params[obj_context->decode_state.num_slice_params]);
-    i965_reference_buffer_store(&obj_context->decode_state.slice_params[obj_context->decode_state.num_slice_params],
+    i965_release_buffer_store(&obj_context->codec_state.dec.slice_params[obj_context->codec_state.dec.num_slice_params]);
+    i965_reference_buffer_store(&obj_context->codec_state.dec.slice_params[obj_context->codec_state.dec.num_slice_params],
                                 obj_buffer->buffer_store);
-    obj_context->decode_state.num_slice_params++;
+    obj_context->codec_state.dec.num_slice_params++;
     
     return VA_STATUS_SUCCESS;
 }
@@ -1161,34 +1262,31 @@ i965_render_slice_data_buffer(VADriverContextP ctx,
     assert(obj_buffer->buffer_store->buffer == NULL);
     assert(obj_buffer->buffer_store->bo);
 
-    if (obj_context->decode_state.num_slice_datas == obj_context->decode_state.max_slice_datas) {
-        obj_context->decode_state.slice_datas = realloc(obj_context->decode_state.slice_datas,
-                                                        (obj_context->decode_state.max_slice_datas + NUM_SLICES) * sizeof(*obj_context->decode_state.slice_datas));
-        memset(obj_context->decode_state.slice_datas + obj_context->decode_state.max_slice_datas, 0, NUM_SLICES * sizeof(*obj_context->decode_state.slice_datas));
-        obj_context->decode_state.max_slice_datas += NUM_SLICES;
+    if (obj_context->codec_state.dec.num_slice_datas == obj_context->codec_state.dec.max_slice_datas) {
+        obj_context->codec_state.dec.slice_datas = realloc(obj_context->codec_state.dec.slice_datas,
+                                                        (obj_context->codec_state.dec.max_slice_datas + NUM_SLICES) * sizeof(*obj_context->codec_state.dec.slice_datas));
+        memset(obj_context->codec_state.dec.slice_datas + obj_context->codec_state.dec.max_slice_datas, 0, NUM_SLICES * sizeof(*obj_context->codec_state.dec.slice_datas));
+        obj_context->codec_state.dec.max_slice_datas += NUM_SLICES;
     }
         
-    i965_release_buffer_store(&obj_context->decode_state.slice_datas[obj_context->decode_state.num_slice_datas]);
-    i965_reference_buffer_store(&obj_context->decode_state.slice_datas[obj_context->decode_state.num_slice_datas],
+    i965_release_buffer_store(&obj_context->codec_state.dec.slice_datas[obj_context->codec_state.dec.num_slice_datas]);
+    i965_reference_buffer_store(&obj_context->codec_state.dec.slice_datas[obj_context->codec_state.dec.num_slice_datas],
                                 obj_buffer->buffer_store);
-    obj_context->decode_state.num_slice_datas++;
+    obj_context->codec_state.dec.num_slice_datas++;
     
     return VA_STATUS_SUCCESS;
 }
 
-VAStatus 
-i965_RenderPicture(VADriverContextP ctx,
-                   VAContextID context,
-                   VABufferID *buffers,
-                   int num_buffers)
+static VAStatus 
+i965_decoder_render_picture(VADriverContextP ctx,
+                            VAContextID context,
+                            VABufferID *buffers,
+                            int num_buffers)
 {
-    struct i965_driver_data *i965 = i965_driver_data(ctx);
-    struct object_context *obj_context;
+    struct i965_driver_data *i965 = i965_driver_data(ctx); 
+    struct object_context *obj_context = CONTEXT(context);
+    VAStatus vaStatus;
     int i;
-    VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
-
-    obj_context = CONTEXT(context);
-    assert(obj_context);
 
     for (i = 0; i < num_buffers; i++) {
         struct object_buffer *obj_buffer = BUFFER(buffers[i]);
@@ -1216,8 +1314,177 @@ i965_RenderPicture(VADriverContextP ctx,
             break;
 
         default:
+            vaStatus = VA_STATUS_ERROR_UNSUPPORTED_BUFFERTYPE;
             break;
         }
+    }
+
+    return vaStatus;
+}
+
+static VAStatus
+i965_encoder_render_squence_parameter_buffer(VADriverContextP ctx, 
+                                             struct object_context *obj_context,
+                                             struct object_buffer *obj_buffer)
+{
+    assert(obj_buffer->buffer_store->bo == NULL);
+    assert(obj_buffer->buffer_store->buffer);
+    i965_release_buffer_store(&obj_context->codec_state.enc.seq_param);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.seq_param,
+                                obj_buffer->buffer_store);
+
+    return VA_STATUS_SUCCESS;
+}
+
+
+static VAStatus
+i965_encoder_render_picture_parameter_buffer(VADriverContextP ctx, 
+                                             struct object_context *obj_context,
+                                             struct object_buffer *obj_buffer)
+{
+    assert(obj_buffer->buffer_store->bo == NULL);
+    assert(obj_buffer->buffer_store->buffer);
+    i965_release_buffer_store(&obj_context->codec_state.enc.pic_param);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.pic_param,
+                                obj_buffer->buffer_store);
+
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus
+i965_encoder_render_slice_parameter_buffer(VADriverContextP ctx, 
+                                           struct object_context *obj_context,
+                                           struct object_buffer *obj_buffer)
+{
+    if (obj_context->codec_state.enc.num_slice_params == obj_context->codec_state.enc.max_slice_params) {
+        obj_context->codec_state.enc.slice_params = realloc(obj_context->codec_state.enc.slice_params,
+                                                            (obj_context->codec_state.enc.max_slice_params + NUM_SLICES) * sizeof(*obj_context->codec_state.enc.slice_params));
+        memset(obj_context->codec_state.enc.slice_params + obj_context->codec_state.enc.max_slice_params, 0, NUM_SLICES * sizeof(*obj_context->codec_state.enc.slice_params));
+        obj_context->codec_state.enc.max_slice_params += NUM_SLICES;
+    }
+
+    i965_release_buffer_store(&obj_context->codec_state.enc.slice_params[obj_context->codec_state.enc.num_slice_params]);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.slice_params[obj_context->codec_state.enc.num_slice_params],
+                                obj_buffer->buffer_store);
+    obj_context->codec_state.enc.num_slice_params++;
+    
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus
+i965_encoder_render_picture_control_buffer(VADriverContextP ctx, 
+                                           struct object_context *obj_context,
+                                           struct object_buffer *obj_buffer)
+{
+    assert(obj_buffer->buffer_store->bo == NULL);
+    assert(obj_buffer->buffer_store->buffer);
+    i965_release_buffer_store(&obj_context->codec_state.enc.pic_control);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.pic_control,
+                                obj_buffer->buffer_store);
+
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus
+i965_encoder_render_qmatrix_buffer(VADriverContextP ctx, 
+                                   struct object_context *obj_context,
+                                   struct object_buffer *obj_buffer)
+{
+    assert(obj_buffer->buffer_store->bo == NULL);
+    assert(obj_buffer->buffer_store->buffer);
+    i965_release_buffer_store(&obj_context->codec_state.enc.q_matrix);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.iq_matrix,
+                                obj_buffer->buffer_store);
+    
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus
+i965_encoder_render_iqmatrix_buffer(VADriverContextP ctx, 
+                                    struct object_context *obj_context,
+                                    struct object_buffer *obj_buffer)
+{
+    assert(obj_buffer->buffer_store->bo == NULL);
+    assert(obj_buffer->buffer_store->buffer);
+    i965_release_buffer_store(&obj_context->codec_state.enc.iq_matrix);
+    i965_reference_buffer_store(&obj_context->codec_state.enc.iq_matrix,
+                                obj_buffer->buffer_store);
+
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus 
+i965_encoder_render_picture(VADriverContextP ctx,
+                            VAContextID context,
+                            VABufferID *buffers,
+                            int num_buffers)
+{
+    struct i965_driver_data *i965 = i965_driver_data(ctx); 
+    struct object_context *obj_context = CONTEXT(context);
+    VAStatus vaStatus;
+    int i;
+
+    for (i = 0; i < num_buffers; i++) {  
+        struct object_buffer *obj_buffer = BUFFER(buffers[i]);
+        assert(obj_buffer);
+
+        switch (obj_buffer->type) {
+        case VAEncSequenceParameterBufferType:
+            vaStatus = i965_encoder_render_squence_parameter_buffer(ctx, obj_context, obj_buffer);
+            break;
+
+        case VAEncPictureParameterBufferType:
+            vaStatus = i965_encoder_render_picture_parameter_buffer(ctx, obj_context, obj_buffer);
+            break;		
+
+        case VAEncSliceParameterBufferType:
+            vaStatus = i965_encoder_render_slice_parameter_buffer(ctx, obj_context, obj_buffer);
+            break;
+
+        case VAPictureParameterBufferType:
+            vaStatus = i965_encoder_render_picture_control_buffer(ctx, obj_context, obj_buffer);
+            break;
+
+        case VAQMatrixBufferType:
+            vaStatus = i965_encoder_render_qmatrix_buffer(ctx, obj_context, obj_buffer);
+            break;
+
+        case VAIQMatrixBufferType:
+            vaStatus = i965_encoder_render_iqmatrix_buffer(ctx, obj_context, obj_buffer);
+            break;
+
+        default:
+            vaStatus = VA_STATUS_ERROR_UNSUPPORTED_BUFFERTYPE;
+            break;
+        }
+    }	
+
+    return vaStatus;
+}
+
+VAStatus 
+i965_RenderPicture(VADriverContextP ctx,
+                   VAContextID context,
+                   VABufferID *buffers,
+                   int num_buffers)
+{
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct object_context *obj_context;
+    struct object_config *obj_config;
+    VAContextID config;
+    VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
+
+    obj_context = CONTEXT(context);
+    assert(obj_context);
+
+    config = obj_context->config_id;
+    obj_config = CONFIG(config);
+    assert(obj_config);
+
+    if (VAEntrypointEncSlice == obj_config->entrypoint ){
+        vaStatus = i965_encoder_render_picture(ctx, context, buffers, num_buffers);
+    } else {
+        vaStatus = i965_decoder_render_picture(ctx, context, buffers, num_buffers);
     }
 
     return vaStatus;
@@ -1233,26 +1500,47 @@ i965_EndPicture(VADriverContextP ctx, VAContextID context)
     int i;
 
     assert(obj_context);
-    assert(obj_context->decode_state.pic_param);
-    assert(obj_context->decode_state.num_slice_params >= 1);
-    assert(obj_context->decode_state.num_slice_datas >= 1);
-    assert(obj_context->decode_state.num_slice_params == obj_context->decode_state.num_slice_datas);
-
     config = obj_context->config_id;
     obj_config = CONFIG(config);
     assert(obj_config);
 
-    i965_media_decode_picture(ctx, obj_config->profile, &obj_context->decode_state);
-    obj_context->decode_state.current_render_target = -1;
-    obj_context->decode_state.num_slice_params = 0;
-    obj_context->decode_state.num_slice_datas = 0;
-    i965_release_buffer_store(&obj_context->decode_state.pic_param);
-    i965_release_buffer_store(&obj_context->decode_state.iq_matrix);
-    i965_release_buffer_store(&obj_context->decode_state.bit_plane);
+    if (obj_context->codec_type == CODEC_ENC) {
+        assert(VAEntrypointEncSlice == obj_config->entrypoint);
 
-    for (i = 0; i < obj_context->decode_state.num_slice_params; i++) {
-        i965_release_buffer_store(&obj_context->decode_state.slice_params[i]);
-        i965_release_buffer_store(&obj_context->decode_state.slice_datas[i]);
+        assert(obj_context->codec_state.enc.pic_param);
+        assert(obj_context->codec_state.enc.seq_param);
+        assert(obj_context->codec_state.enc.num_slice_params >= 1);
+    } else {
+        assert(obj_context->codec_state.dec.pic_param);
+        assert(obj_context->codec_state.dec.num_slice_params >= 1);
+        assert(obj_context->codec_state.dec.num_slice_datas >= 1);
+        assert(obj_context->codec_state.dec.num_slice_params == obj_context->codec_state.dec.num_slice_datas);
+    }
+
+    assert(obj_context->hw_context->run);
+    obj_context->hw_context->run(ctx, obj_config->profile, &obj_context->codec_state, obj_context->hw_context);
+
+    if (obj_context->codec_type == CODEC_ENC) {
+        obj_context->codec_state.enc.current_render_target = VA_INVALID_SURFACE;
+        obj_context->codec_state.enc.num_slice_params = 0;
+        i965_release_buffer_store(&obj_context->codec_state.enc.pic_param);
+        i965_release_buffer_store(&obj_context->codec_state.enc.seq_param);
+
+        for (i = 0; i < obj_context->codec_state.enc.num_slice_params; i++) {
+            i965_release_buffer_store(&obj_context->codec_state.enc.slice_params[i]);
+        }
+    } else {
+        obj_context->codec_state.dec.current_render_target = -1;
+        obj_context->codec_state.dec.num_slice_params = 0;
+        obj_context->codec_state.dec.num_slice_datas = 0;
+        i965_release_buffer_store(&obj_context->codec_state.dec.pic_param);
+        i965_release_buffer_store(&obj_context->codec_state.dec.iq_matrix);
+        i965_release_buffer_store(&obj_context->codec_state.dec.bit_plane);
+
+        for (i = 0; i < obj_context->codec_state.dec.num_slice_params; i++) {
+            i965_release_buffer_store(&obj_context->codec_state.dec.slice_params[i]);
+            i965_release_buffer_store(&obj_context->codec_state.dec.slice_datas[i]);
+        }
     }
 
     return VA_STATUS_SUCCESS;
@@ -1280,9 +1568,6 @@ i965_QuerySurfaceStatus(VADriverContextP ctx,
 
     assert(obj_surface);
 
-    /* Commit pending operations to the HW */
-    intel_batchbuffer_flush(ctx);
-
     /* Usually GEM will handle synchronization with the graphics hardware */
 #if 0
     if (obj_surface->bo) {
@@ -1305,8 +1590,8 @@ i965_QuerySurfaceStatus(VADriverContextP ctx,
  */
 VAStatus 
 i965_QueryDisplayAttributes(VADriverContextP ctx,
-                            VADisplayAttribute *attr_list,	/* out */
-                            int *num_attributes)		/* out */
+                            VADisplayAttribute *attr_list,    /* out */
+                            int *num_attributes)              /* out */
 {
     if (num_attributes)
         *num_attributes = 0;
@@ -1322,7 +1607,7 @@ i965_QueryDisplayAttributes(VADriverContextP ctx,
  */
 VAStatus 
 i965_GetDisplayAttributes(VADriverContextP ctx,
-                          VADisplayAttribute *attr_list,	/* in/out */
+                          VADisplayAttribute *attr_list,    /* in/out */
                           int num_attributes)
 {
     /* TODO */
@@ -1362,12 +1647,15 @@ i965_Init(VADriverContextP ctx)
     if (intel_driver_init(ctx) == False)
         return VA_STATUS_ERROR_UNKNOWN;
 
-    if (!IS_G4X(i965->intel.device_id) &&
-        !IS_IRONLAKE(i965->intel.device_id) &&
-        !IS_GEN6(i965->intel.device_id))
-        return VA_STATUS_ERROR_UNKNOWN;
-
-    if (i965_media_init(ctx) == False)
+    if (IS_G4X(i965->intel.device_id))
+        i965->codec_info = &g4x_hw_codec_info;
+    else if (IS_IRONLAKE(i965->intel.device_id))
+        i965->codec_info = &ironlake_hw_codec_info;
+    else if (IS_GEN6(i965->intel.device_id))
+        i965->codec_info = &gen6_hw_codec_info;
+    else if (IS_GEN7(i965->intel.device_id))
+        i965->codec_info = &gen7_hw_codec_info;
+    else
         return VA_STATUS_ERROR_UNKNOWN;
 
     if (i965_post_processing_init(ctx) == False)
@@ -1375,6 +1663,9 @@ i965_Init(VADriverContextP ctx)
 
     if (i965_render_init(ctx) == False)
         return VA_STATUS_ERROR_UNKNOWN;
+
+    _i965InitMutex(&i965->render_mutex);
+    i965->batch = intel_batchbuffer_new(&i965->intel, I915_EXEC_RENDER);
 
     return VA_STATUS_SUCCESS;
 }
@@ -1518,9 +1809,45 @@ i965_CreateImage(VADriverContextP ctx,
     *out_image                  = *image;
     return VA_STATUS_SUCCESS;
 
-error:
+ error:
     i965_DestroyImage(ctx, image_id);
     return va_status;
+}
+
+void 
+i965_check_alloc_surface_bo(VADriverContextP ctx,
+                            struct object_surface *obj_surface,
+                            int tiled,
+                            unsigned int fourcc)
+{
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+
+    if (obj_surface->bo)
+        return;
+
+    if (tiled) {
+        uint32_t tiling_mode = I915_TILING_Y; /* always uses Y-tiled format */
+        unsigned long pitch;
+
+        obj_surface->bo = drm_intel_bo_alloc_tiled(i965->intel.bufmgr, 
+                                                   "vaapi surface",
+                                                   obj_surface->width, 
+                                                   obj_surface->height + obj_surface->height / 2,
+                                                   1,
+                                                   &tiling_mode,
+                                                   &pitch,
+                                                   0);
+        assert(tiling_mode == I915_TILING_Y);
+        assert(pitch == obj_surface->width);
+    } else {
+        obj_surface->bo = dri_bo_alloc(i965->intel.bufmgr,
+                                       "vaapi surface",
+                                       obj_surface->size,
+                                       0x1000);
+    }
+
+    obj_surface->fourcc = fourcc;
+    assert(obj_surface->bo);
 }
 
 VAStatus i965_DeriveImage(VADriverContextP ctx,
@@ -1572,54 +1899,42 @@ VAStatus i965_DeriveImage(VADriverContextP ctx,
     image->height = obj_surface->orig_height;
     image->data_size = data_size;
 
-    if (render_state->interleaved_uv) {
-        image->format.fourcc = VA_FOURCC('N','V','1','2');
-        image->format.byte_order = VA_LSB_FIRST;
-        image->format.bits_per_pixel = 12;
-        image->num_planes = 2;
-        image->pitches[0] = w_pitch;
-        image->offsets[0] = 0;
-        image->pitches[1] = w_pitch;
-        image->offsets[1] = w_pitch * h_pitch;
+    if (!render_state->inited) {
+            image->format.fourcc = VA_FOURCC('Y','V','1','2');
+            image->format.byte_order = VA_LSB_FIRST;
+            image->format.bits_per_pixel = 12;
+            image->num_planes = 3;
+            image->pitches[0] = w_pitch;
+            image->offsets[0] = 0;
+            image->pitches[1] = w_pitch / 2;
+            image->offsets[1] = w_pitch * h_pitch;
+            image->pitches[2] = w_pitch / 2;
+            image->offsets[2] = w_pitch * h_pitch + (w_pitch / 2) * (h_pitch / 2);
     } else {
-        image->format.fourcc = VA_FOURCC('Y','V','1','2');
-        image->format.byte_order = VA_LSB_FIRST;
-        image->format.bits_per_pixel = 12;
-        image->num_planes = 3;
-        image->pitches[0] = w_pitch;
-        image->offsets[0] = 0;
-        image->pitches[1] = w_pitch / 2;
-        image->offsets[1] = w_pitch * h_pitch;
-        image->pitches[2] = w_pitch / 2;
-        image->offsets[2] = w_pitch * h_pitch + (w_pitch / 2) * (h_pitch / 2);
-    }
-
-    if (obj_surface->bo == NULL) {
-        if (HAS_TILED_SURFACE(i965)) {
-        
-            uint32_t tiling_mode = I915_TILING_Y;
-            unsigned long pitch;
-
-            obj_surface->bo = drm_intel_bo_alloc_tiled(i965->intel.bufmgr, 
-                                                       "vaapi surface",
-                                                       obj_surface->width, 
-                                                       obj_surface->height + obj_surface->height / 2,
-                                                       1,
-                                                       &tiling_mode,
-                                                       &pitch,
-                                                       0);
-            assert(obj_surface->bo);
-            assert(tiling_mode == I915_TILING_Y);
-            assert(pitch == obj_surface->width);
+        if (render_state->interleaved_uv) {
+            image->format.fourcc = VA_FOURCC('N','V','1','2');
+            image->format.byte_order = VA_LSB_FIRST;
+            image->format.bits_per_pixel = 12;
+            image->num_planes = 2;
+            image->pitches[0] = w_pitch;
+            image->offsets[0] = 0;
+            image->pitches[1] = w_pitch;
+            image->offsets[1] = w_pitch * h_pitch;
         } else {
-            obj_surface->bo = dri_bo_alloc(i965->intel.bufmgr,
-                                           "vaapi surface",
-                                           obj_surface->size,
-                                           0x1000);
+            image->format.fourcc = VA_FOURCC('I','4','2','0');
+            image->format.byte_order = VA_LSB_FIRST;
+            image->format.bits_per_pixel = 12;
+            image->num_planes = 3;
+            image->pitches[0] = w_pitch;
+            image->offsets[0] = 0;
+            image->pitches[1] = w_pitch / 2;
+            image->offsets[1] = w_pitch * h_pitch;
+            image->pitches[2] = w_pitch / 2;
+            image->offsets[2] = w_pitch * h_pitch + (w_pitch / 2) * (h_pitch / 2);
         }
     }
 
-    assert(obj_surface->bo);
+    i965_check_alloc_surface_bo(ctx, obj_surface, HAS_TILED_SURFACE(i965), image->format.fourcc);
     va_status = i965_create_buffer_internal(ctx, 0, VAImageBufferType,
                                             obj_surface->size, 1, NULL, obj_surface->bo, &image->buf);
     if (va_status != VA_STATUS_SUCCESS)
@@ -1638,10 +1953,11 @@ VAStatus i965_DeriveImage(VADriverContextP ctx,
 
     *out_image = *image;
     obj_surface->flags |= SURFACE_DERIVED;
+    obj_image->derived_surface = surface;
 
     return VA_STATUS_SUCCESS;
 
-error:
+ error:
     i965_DestroyImage(ctx, image_id);
     return va_status;
 }
@@ -1683,7 +1999,7 @@ i965_DestroyImage(VADriverContextP ctx, VAImageID image)
     }
 
     i965_destroy_image(&i965->image_heap, (struct object_base *)obj_image);
-	
+
     return VA_STATUS_SUCCESS;
 }
 
@@ -1735,13 +2051,14 @@ get_image_i420(struct object_image *obj_image, uint8_t *image_data,
 {
     uint8_t *dst[3], *src[3];
     const int Y = 0;
-    const int U = obj_image->image.format.fourcc == VA_FOURCC_YV12 ? 2 : 1;
-    const int V = obj_image->image.format.fourcc == VA_FOURCC_YV12 ? 1 : 2;
+    const int U = obj_image->image.format.fourcc == obj_surface->fourcc ? 1 : 2;
+    const int V = obj_image->image.format.fourcc == obj_surface->fourcc ? 2 : 1;
     unsigned int tiling, swizzle;
 
     if (!obj_surface->bo)
         return;
 
+    assert(obj_surface->fourcc);
     dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
     if (tiling != I915_TILING_NONE)
@@ -1799,6 +2116,7 @@ get_image_nv12(struct object_image *obj_image, uint8_t *image_data,
     if (!obj_surface->bo)
         return;
 
+    assert(obj_surface->fourcc);
     dri_bo_get_tiling(obj_surface->bo, &tiling, &swizzle);
 
     if (tiling != I915_TILING_NONE)
@@ -1864,9 +2182,6 @@ i965_GetImage(VADriverContextP ctx,
         y + height > obj_image->image.height)
         return VA_STATUS_ERROR_INVALID_PARAMETER;
 
-    /* Commit pending operations to the HW */
-    intel_batchbuffer_flush(ctx);
-
     VAStatus va_status;
     void *image_data = NULL;
 
@@ -1927,10 +2242,12 @@ i965_PutSurface(VADriverContextP ctx,
     union dri_buffer *buffer;
     struct intel_region *dest_region;
     struct object_surface *obj_surface; 
+    VARectangle src_rect, dst_rect;
     int ret;
     uint32_t name;
     Bool new_region = False;
     int pp_flag = 0;
+
     /* Currently don't support DRI1 */
     if (dri_state->driConnectedFlag != VA_DRI2)
         return VA_STATUS_ERROR_UNKNOWN;
@@ -1941,6 +2258,8 @@ i965_PutSurface(VADriverContextP ctx,
     obj_surface = SURFACE(surface);
     if (!obj_surface || !obj_surface->bo)
         return VA_STATUS_SUCCESS;
+
+    _i965LockMutex(&i965->render_mutex);
 
     dri_drawable = dri_get_drawable(ctx, (Drawable)draw);
     assert(dri_drawable);
@@ -1986,16 +2305,21 @@ i965_PutSurface(VADriverContextP ctx,
     if (flags & (VA_BOTTOM_FIELD | VA_TOP_FIELD))
         pp_flag |= I965_PP_FLAG_DEINTERLACING;
 
-    intel_render_put_surface(ctx, surface,
-                            srcx, srcy, srcw, srch,
-                            destx, desty, destw, desth,
-                            pp_flag);
+    src_rect.x      = srcx;
+    src_rect.y      = srcy;
+    src_rect.width  = srcw;
+    src_rect.height = srch;
 
-    if(obj_surface->subpic != VA_INVALID_ID) {	
-	intel_render_put_subpicture(ctx, surface,
-                                    srcx, srcy, srcw, srch,
-                                    destx, desty, destw, desth);
-    } 
+    dst_rect.x      = destx;
+    dst_rect.y      = desty;
+    dst_rect.width  = destw;
+    dst_rect.height = desth;
+
+    intel_render_put_surface(ctx, surface, &src_rect, &dst_rect, pp_flag);
+
+    if(obj_surface->subpic != VA_INVALID_ID) {
+        intel_render_put_subpicture(ctx, surface, &src_rect, &dst_rect);
+    }
 
     dri_swap_buffer(ctx, dri_drawable);
     obj_surface->flags |= SURFACE_DISPLAYED;
@@ -2009,6 +2333,8 @@ i965_PutSurface(VADriverContextP ctx,
             obj_surface->free_private_data(&obj_surface->private_data);
     }
 
+    _i965UnlockMutex(&i965->render_mutex);
+
     return VA_STATUS_SUCCESS;
 }
 
@@ -2017,17 +2343,19 @@ i965_Terminate(VADriverContextP ctx)
 {
     struct i965_driver_data *i965 = i965_driver_data(ctx);
 
+    if (i965->batch)
+        intel_batchbuffer_free(i965->batch);
+
+    _i965DestroyMutex(&i965->render_mutex);
+
     if (i965_render_terminate(ctx) == False)
-	return VA_STATUS_ERROR_UNKNOWN;
+        return VA_STATUS_ERROR_UNKNOWN;
 
     if (i965_post_processing_terminate(ctx) == False)
         return VA_STATUS_ERROR_UNKNOWN;
 
-    if (i965_media_terminate(ctx) == False)
-	return VA_STATUS_ERROR_UNKNOWN;
-
     if (intel_driver_terminate(ctx) == False)
-	return VA_STATUS_ERROR_UNKNOWN;
+        return VA_STATUS_ERROR_UNKNOWN;
 
     i965_destroy_heap(&i965->buffer_heap, i965_destroy_buffer);
     i965_destroy_heap(&i965->image_heap, i965_destroy_image);
@@ -2041,6 +2369,161 @@ i965_Terminate(VADriverContextP ctx)
 
     return VA_STATUS_SUCCESS;
 }
+
+static VAStatus
+i965_BufferInfo(
+    VADriverContextP ctx,       /* in */
+    VABufferID buf_id,          /* in */
+    VABufferType *type,         /* out */
+    unsigned int *size,         /* out */
+    unsigned int *num_elements  /* out */
+)
+{
+    struct i965_driver_data *i965 = NULL;
+    struct object_buffer *obj_buffer = NULL;
+
+    i965 = i965_driver_data(ctx);
+    obj_buffer = BUFFER(buf_id);
+
+    *type = obj_buffer->type;
+    *size = obj_buffer->size_element;
+    *num_elements = obj_buffer->num_elements;
+
+    return VA_STATUS_SUCCESS;
+}
+
+static VAStatus
+i965_LockSurface(
+    VADriverContextP ctx,           /* in */
+    VASurfaceID surface,            /* in */
+    unsigned int *fourcc,           /* out */
+    unsigned int *luma_stride,      /* out */
+    unsigned int *chroma_u_stride,  /* out */
+    unsigned int *chroma_v_stride,  /* out */
+    unsigned int *luma_offset,      /* out */
+    unsigned int *chroma_u_offset,  /* out */
+    unsigned int *chroma_v_offset,  /* out */
+    unsigned int *buffer_name,      /* out */
+    void **buffer                   /* out */
+)
+{
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct object_surface *obj_surface = NULL;
+    VAImage tmpImage;
+
+    assert(fourcc);
+    assert(luma_stride);
+    assert(chroma_u_stride);
+    assert(chroma_v_stride);
+    assert(luma_offset);
+    assert(chroma_u_offset);
+    assert(chroma_v_offset);
+    assert(buffer_name);
+    assert(buffer);
+
+    tmpImage.image_id = VA_INVALID_ID;
+
+    obj_surface = SURFACE(surface);
+    if (obj_surface == NULL) {
+        // Surface is absent.
+        vaStatus = VA_STATUS_ERROR_INVALID_PARAMETER;
+        goto error;
+    }
+
+    // Lock functionality is absent now.
+    if (obj_surface->locked_image_id != VA_INVALID_ID) {
+        // Surface is locked already.
+        vaStatus = VA_STATUS_ERROR_INVALID_PARAMETER;
+        goto error;
+    }
+
+    vaStatus = i965_DeriveImage(
+        ctx,
+        surface,
+        &tmpImage);
+    if (vaStatus != VA_STATUS_SUCCESS) {
+        goto error;
+    }
+
+    obj_surface->locked_image_id = tmpImage.image_id;
+
+    vaStatus = i965_MapBuffer(
+        ctx,
+        tmpImage.buf,
+        buffer);
+    if (vaStatus != VA_STATUS_SUCCESS) {
+        goto error;
+    }
+
+    *fourcc = tmpImage.format.fourcc;
+    *luma_offset = tmpImage.offsets[0];
+    *luma_stride = tmpImage.pitches[0];
+    *chroma_u_offset = tmpImage.offsets[1];
+    *chroma_u_stride = tmpImage.pitches[1];
+    *chroma_v_offset = tmpImage.offsets[2];
+    *chroma_v_stride = tmpImage.pitches[2];
+    *buffer_name = tmpImage.buf;
+
+error:
+    if (vaStatus != VA_STATUS_SUCCESS) {
+        buffer = NULL;
+    }
+
+    return vaStatus;
+}
+
+static VAStatus
+i965_UnlockSurface(
+    VADriverContextP ctx,   /* in */
+    VASurfaceID surface     /* in */
+)
+{
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
+    struct i965_driver_data *i965 = i965_driver_data(ctx);
+    struct object_image *locked_img = NULL;
+    struct object_surface *obj_surface = NULL;
+
+    obj_surface = SURFACE(surface);
+
+    if (obj_surface == NULL) {
+        vaStatus = VA_STATUS_ERROR_INVALID_PARAMETER;   // Surface is absent
+        goto error;
+    }
+    if (obj_surface->locked_image_id == VA_INVALID_ID) {
+        vaStatus = VA_STATUS_ERROR_INVALID_PARAMETER;   // Surface is not locked
+        goto error;
+    }
+
+    locked_img = IMAGE(obj_surface->locked_image_id);
+    if (locked_img == NULL || (locked_img->image.image_id == VA_INVALID_ID)) {
+        // Work image was deallocated before i965_UnlockSurface()
+        vaStatus = VA_STATUS_ERROR_INVALID_PARAMETER;
+        goto error;
+    }
+
+    vaStatus = i965_UnmapBuffer(
+        ctx,
+        locked_img->image.buf);
+    if (vaStatus != VA_STATUS_SUCCESS) {
+        goto error;
+    }
+
+    vaStatus = i965_DestroyImage(
+        ctx,
+        locked_img->image.image_id);
+    if (vaStatus != VA_STATUS_SUCCESS) {
+        goto error;
+    }
+
+    locked_img->image.image_id = VA_INVALID_ID;
+
+ error:
+    return vaStatus;
+}
+
+VAStatus DLL_EXPORT
+VA_DRIVER_INIT_FUNC(VADriverContextP ctx);
 
 VAStatus 
 VA_DRIVER_INIT_FUNC(  VADriverContextP ctx )
@@ -2100,7 +2583,10 @@ VA_DRIVER_INIT_FUNC(  VADriverContextP ctx )
     vtable->vaQueryDisplayAttributes = i965_QueryDisplayAttributes;
     vtable->vaGetDisplayAttributes = i965_GetDisplayAttributes;
     vtable->vaSetDisplayAttributes = i965_SetDisplayAttributes;
-//    vtable->vaDbgCopySurfaceToBuffer = i965_DbgCopySurfaceToBuffer;
+    vtable->vaBufferInfo = i965_BufferInfo;
+    vtable->vaLockSurface = i965_LockSurface;
+    vtable->vaUnlockSurface = i965_UnlockSurface;
+    //    vtable->vaDbgCopySurfaceToBuffer = i965_DbgCopySurfaceToBuffer;
 
     i965 = (struct i965_driver_data *)calloc(1, sizeof(*i965));
     assert(i965);
@@ -2130,7 +2616,7 @@ VA_DRIVER_INIT_FUNC(  VADriverContextP ctx )
                               sizeof(struct object_image), 
                               IMAGE_ID_OFFSET);
     assert(result == 0);
-	
+
     result = object_heap_init(&i965->subpic_heap, 
                               sizeof(struct object_subpic), 
                               SUBPIC_ID_OFFSET);

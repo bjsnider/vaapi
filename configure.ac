@@ -29,7 +29,7 @@ m4_define([libva_version],
           [libva_major_version.libva_minor_version.libva_micro_version])
 
 # if the library source code has changed, increment revision
-m4_define([libva_lt_revision], [12])
+m4_define([libva_lt_revision], [14])
 # if any interface was added/removed/changed, then inc current, reset revision
 m4_define([libva_lt_current], [1])
 # if any interface was added since last public release, then increment age
@@ -92,6 +92,7 @@ AC_SUBST(LIBVA_DRIVERS_PATH)
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_PROG_CC
+AC_PROG_CXX
 
 AC_HEADER_STDC
 AC_SYS_LARGEFILE
@@ -178,6 +179,7 @@ AC_OUTPUT([
 	i965_drv_video/shaders/mpeg2/vld/Makefile
 	i965_drv_video/shaders/render/Makefile
 	i965_drv_video/shaders/post_processing/Makefile
+	i965_drv_video/shaders/vme/Makefile
 	test/Makefile
 	test/basic/Makefile
 	test/decode/Makefile
