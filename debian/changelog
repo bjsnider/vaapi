@@ -4,7 +4,7 @@ libva (1.0.14-1) unstable; urgency=low
   * Updated to my @debian.org email.
 
   [ Reinhard Tartler ]
-  * New Upstream version: 1.0.14, Closes #639893
+  * New Upstream version: 1.0.14, Closes: #639893
   * Bump shlibs for changes in va/va.h
   * debian/patches/remove-unneeded-dep.patch: add Dep-5 Headers
   * refresh patches
