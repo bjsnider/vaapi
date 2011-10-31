@@ -6,21 +6,20 @@ Last-Update: 2011-02-13
 
 --- a/va/Makefile.am
 +++ b/va/Makefile.am
-@@ -43,9 +43,9 @@
- libva_x11_backenddir   = x11
+@@ -72,8 +72,8 @@ SUBDIRS				+= x11
+ lib_LTLIBRARIES			+= libva-x11.la
+ libva_x11_la_SOURCES		= 
+ libva_x11_la_LDFLAGS		= $(LDADD)
+-libva_x11_la_DEPENDENCIES	= $(libvacorelib) x11/libva_x11.la
+-libva_x11_la_LIBADD		= $(libvacorelib) x11/libva_x11.la \
++libva_x11_la_DEPENDENCIES	= x11/libva_x11.la
++libva_x11_la_LIBADD		= x11/libva_x11.la \
+ 	$(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(DRM_LIBS) $(XFIXES_LIBS) -ldl
  
- libva_x11_la_SOURCES = 
--libva_x11_la_LIBADD  = $(libvacorelib) x11/libva_x11.la $(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(DRM_LIBS) $(XFIXES_LIBS) -ldl
-+libva_x11_la_LIBADD  = x11/libva_x11.la $(LIBVA_LIBS) $(X11_LIBS) $(XEXT_LIBS) $(DRM_LIBS) $(XFIXES_LIBS) -ldl
- libva_x11_la_LDFLAGS = $(LDADD)
--libva_x11_la_DEPENDENCIES = $(libvacorelib) x11/libva_x11.la
-+libva_x11_la_DEPENDENCIES = x11/libva_x11.la
- 
- if BUILD_DUMMY_BACKEND
- libva_dummy_backend = libva-dummy.la
+ if USE_GLX
 --- a/test/basic/Makefile.am
 +++ b/test/basic/Makefile.am
-@@ -25,7 +25,8 @@
+@@ -25,7 +25,8 @@ check_PROGRAMS = test_01 test_02 test_03
  
  AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/src/x11
  
@@ -32,33 +31,33 @@ Last-Update: 2011-02-13
  test_01_SOURCES = test_01.c
 --- a/test/decode/Makefile.am
 +++ b/test/decode/Makefile.am
-@@ -24,7 +24,8 @@
+@@ -24,7 +24,8 @@ bin_PROGRAMS = mpeg2vldemo
  
- AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/src/x11
+ INCLUDES = -I$(top_srcdir)
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
 +  $(top_builddir)/va/$(libvacorelib) $(X11_LIBS)
  
  mpeg2vldemo_LDADD = $(TEST_LIBS)
- mpeg2vldemo_SOURCES = mpeg2vldemo.c
+ mpeg2vldemo_SOURCES = mpeg2vldemo.cpp
 --- a/test/encode/Makefile.am
 +++ b/test/encode/Makefile.am
-@@ -24,7 +24,8 @@
+@@ -24,7 +24,8 @@ bin_PROGRAMS = h264encode avcenc
  
- AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/src/x11
+ INCLUDES = -I$(top_srcdir)
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib)
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
 +  $(top_builddir)/va/$(libvacorelib) $(X11_LIBS)
  
  h264encode_LDADD = $(TEST_LIBS)
- h264encode_SOURCES = h264encode.c
+ h264encode_SOURCES = h264encode_x11.c
 --- a/test/putsurface/Makefile.am
 +++ b/test/putsurface/Makefile.am
-@@ -24,7 +24,9 @@
+@@ -24,7 +24,9 @@ bin_PROGRAMS = putsurface
  
- AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/src/x11
+ INCLUDES = -I$(top_srcdir)
  
 -TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) -lpthread
 +TEST_LIBS = $(top_builddir)/va/$(libvabackendlib) \
@@ -66,12 +65,12 @@ Last-Update: 2011-02-13
 +  $(X11_LIBS) -lpthread
  
  putsurface_LDADD = $(TEST_LIBS)
- putsurface_SOURCES = putsurface.c
+ putsurface_SOURCES = putsurface_x11.c
 --- a/test/vainfo/Makefile.am
 +++ b/test/vainfo/Makefile.am
 @@ -25,7 +25,7 @@ bin_PROGRAMS = vainfo
  
- AM_CFLAGS = -I$(top_srcdir)/va -I$(top_srcdir)/test/basic -I$(top_srcdir)/src/x11
+ INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/test/basic
  
 -vainfo_LDADD = $(top_builddir)/va/$(libvacorelib) $(top_builddir)/va/$(libvabackendlib)
 +vainfo_LDADD = $(top_builddir)/va/$(libvacorelib) $(top_builddir)/va/$(libvabackendlib) $(X11_LIBS)
