@@ -2,13 +2,7 @@
 
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
-ifeq (,$(findstring hurd,$(DEB_HOST_ARCH)))
-I965_DRIVER=$(shell dpkg-architecture -a$(DEB_HOST_ARCH) -iany-amd64 || \
-	dpkg-architecture -a$(DEB_HOST_ARCH) -iany-i386 && \
-	echo '--enable-i965-driver')
-endif
-
-CONFIGURE_OPTIONS ?= --prefix=/usr --disable-silent-rules $(I965_DRIVER)
+CONFIGURE_OPTIONS ?= --prefix=/usr --disable-silent-rules
 
 %:
 	dh --with autoreconf $@
