@@ -1,3 +1,9 @@
+libva (1.0.15-1) UNRELEASED; urgency=low
+
+  * New Upstream version
+
+ -- Reinhard Tartler <siretart@tauware.de>  Fri, 04 Nov 2011 06:28:24 +0100
+
 libva (1.0.14-1) unstable; urgency=low
 
   [ Andres Mejia ]
