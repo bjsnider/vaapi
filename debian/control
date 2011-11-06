@@ -117,14 +117,12 @@ Description: Video Acceleration (VA) API for Linux -- TPI runtime
  .
  This package provides the libva-tpi library.
 
-Package: i965-va-driver
-Architecture: amd64 i386 kfreebsd-amd64 kfreebsd-i386
-Provides:
- va-driver
+Package: libva-egl1
+Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends}
-Description: Video Acceleration (VA) API for Linux -- i965 VA driver
+Description: Video Acceleration (VA) API for Linux -- EGL runtime
  Video Acceleration API (VA API) is a library ("libVA") and API specification
  which enables and provides access to graphics hardware (GPU) acceleration for
  video processing on Linux and UNIX based operating systems. Accelerated
@@ -134,7 +132,7 @@ Description: Video Acceleration (VA) API for Linux -- i965 VA driver
  limited to GPUs or Intel specific hardware, as other hardware and manufacturers
  can also freely use this API for hardware accelerated video decoding.
  .
- This package provides the Intel i965 VA backend driver.
+ This package provides the libva-egl library.
 
 Package: vainfo
 Architecture: any
