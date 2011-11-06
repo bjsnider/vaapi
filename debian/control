@@ -24,6 +24,8 @@ Package: libva-dev
 Section: libdevel
 Architecture: all
 Depends:
+ libva-egl1 (<< ${source:Upstream-Version}+1~),
+ libva-egl1 (>= ${source:Upstream-Version}),
  libva-glx1 (<< ${source:Upstream-Version}+1~),
  libva-glx1 (>= ${source:Upstream-Version}),
  libva-tpi1 (<< ${source:Upstream-Version}+1~),
